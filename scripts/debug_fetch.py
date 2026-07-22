@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
-"""One-off diagnostic: inspect rentola.hu's dedicated Budapest apartment
-listing page structure (status, listing count, card markup for
-price/size/rooms/address). Not part of the regular tracker run."""
+"""One-off diagnostic: dump the full JSON-LD SearchResultsPage structure
+from rentola.hu's Budapest apartments page, to see every field available
+per listing (address, size, rooms, price). Not part of the regular
+tracker run."""
 
+import json
 import re
 
 import requests
-from bs4 import BeautifulSoup
 
 HEADERS = {
     "User-Agent": (
@@ -23,24 +24,22 @@ def main():
     html = resp.text
     print(f"status: {resp.status_code}; length: {len(html)}")
 
-    hrefs = sorted(set(re.findall(r'href="(/listings/[^"]+)"', html)))
-    print(f"unique listing hrefs: {len(hrefs)}")
-    print(f"sample: {hrefs[:10]}")
+    scripts = re.findall(r'<script type="application/ld\+json">(.*?)</script>', html, re.DOTALL)
+    print(f"JSON-LD blocks: {len(scripts)}")
 
-    soup = BeautifulSoup(html, "html.parser")
-    body = soup.find("body")
-    if body:
-        text = re.sub(r"\s+", " ", body.get_text(" ", strip=True))
-        print(f"body text length: {len(text)}")
-        print(f"body text sample (2500 chars): {text[:2500]}")
-
-    # Show raw HTML around the first listing card to find exact class names.
-    idx = html.find("/listings/")
-    if idx != -1:
-        start = max(0, idx - 800)
-        end = min(len(html), idx + 800)
-        print("--- raw HTML around first listing href ---")
-        print(html[start:end])
+    for s in scripts:
+        try:
+            data = json.loads(s)
+        except json.JSONDecodeError as exc:
+            print(f"  JSON parse failed: {exc}")
+            continue
+        if data.get("@type") != "SearchResultsPage":
+            continue
+        items = data.get("mainEntity", {}).get("itemListElement", [])
+        print(f"itemListElement count: {len(items)}")
+        for item in items[:3]:
+            print("--- item ---")
+            print(json.dumps(item, ensure_ascii=False, indent=2)[:2000])
 
 
 if __name__ == "__main__":

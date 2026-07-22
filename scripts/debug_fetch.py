@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""One-off diagnostic: flatco.hu has a dedicated 'Metrodom Green' nav
-link (it's Metrodom's own property management site) — find that exact
-URL, fetch it, and inspect whether it lists current rental units
-directly or links out to a filtered search. Not part of the regular
-tracker run."""
+"""One-off diagnostic: fetch a flatco.hu rental unit detail page
+(the live nav exposes each currently-available unit as a direct link,
+e.g. 'Metrodom Green - A.B.304' -> /rental/metrodom-green-a-b-304/) and
+inspect what data it contains: price, size, rooms, furnished, terrace,
+move-in date. Not part of the regular tracker run."""
 
 import re
 
@@ -19,45 +19,33 @@ HEADERS = {
     "Accept-Language": "hu-HU,hu;q=0.9,en;q=0.8",
 }
 
+URL = "https://flatco.hu/rental/metrodom-green-a-b-304/"
+
 
 def main():
     session = requests.Session()
-    resp = session.get("https://flatco.hu/", headers=HEADERS, timeout=20)
-    soup = BeautifulSoup(resp.text, "html.parser")
+    resp = session.get(URL, headers=HEADERS, timeout=20)
+    print(f"status: {resp.status_code}; length: {len(resp.text)}")
+    html = resp.text
 
-    print("=== all nav links containing 'Metrodom' ===")
-    metrodom_links = []
-    for a in soup.find_all("a", href=True):
-        if "metrodom" in a.get_text(strip=True).lower():
-            print(f"  text={a.get_text(strip=True)!r} href={a['href']!r}")
-            metrodom_links.append(a["href"])
+    print(f"'Ft' occurrences: {len(re.findall('Ft', html))}")
+    print(f"'m2' or m² occurrences: {len(re.findall('m2|m²', html))}")
+    print(f"'szoba' occurrences: {len(re.findall('szoba', html, re.IGNORECASE))}")
+    print(f"has __NEXT_DATA__: {'__NEXT_DATA__' in html}")
 
-    green_url = None
-    for href in metrodom_links:
-        if "green" in href.lower():
-            green_url = href
-            break
-    if not green_url:
-        print("No href containing 'green' found among Metrodom links.")
-        return
-
-    print(f"\nFetching Metrodom Green page: {green_url}")
-    resp2 = session.get(green_url, headers=HEADERS, timeout=20)
-    print(f"status: {resp2.status_code}; length: {len(resp2.text)}")
-    ft_count = len(re.findall(r"Ft", resp2.text))
-    print(f"'Ft' occurrences: {ft_count}")
-
-    soup2 = BeautifulSoup(resp2.text, "html.parser")
-    body = soup2.find("body")
+    soup = BeautifulSoup(html, "html.parser")
+    body = soup.find("body")
     if body:
         text = re.sub(r"\s+", " ", body.get_text(" ", strip=True))
-        print(f"body text sample (2500 chars): {text[:2500]}")
+        print(f"body text length: {len(text)}")
+        print(f"body text sample (3000 chars): {text[:3000]}")
 
-    hrefs = [a["href"] for a in soup2.find_all("a", href=True)]
-    listing_like = [h for h in hrefs if re.search(r"property|ingatlan|listing|apartman", h, re.IGNORECASE)]
-    print(f"\ntotal hrefs: {len(hrefs)}; property/listing-like: {len(listing_like)}")
-    for h in listing_like[:20]:
-        print(f"  {h}")
+    # Also list all currently-available unit links found anywhere on this page's nav.
+    print("\n=== 'Metrodom Green - X' style links on this page ===")
+    for a in soup.find_all("a", href=True):
+        t = a.get_text(strip=True)
+        if re.match(r"^[A-Za-zÀ-ÿ0-9 .]+ - [A-Za-z0-9.]+$", t):
+            print(f"  text={t!r} href={a['href']!r}")
 
 
 if __name__ == "__main__":

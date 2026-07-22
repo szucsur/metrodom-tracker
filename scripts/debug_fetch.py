@@ -24,22 +24,36 @@ def inspect_alberlet_cards(html: str):
     import re
 
     print(f"  total length: {len(html)}")
-    # Find occurrences of Hungarian rent price pattern "... Ft/hó" for context.
-    for m in list(re.finditer(r"Ft\s*/\s*h[oó]", html, re.IGNORECASE))[:3]:
-        start = max(0, m.start() - 400)
-        end = min(len(html), m.end() + 100)
-        print("  --- context around a price match ---")
-        print("  " + html[start:end].replace("\n", " "))
-    price_count = len(re.findall(r"Ft\s*/\s*h[oó]", html, re.IGNORECASE))
-    print(f"  total 'Ft/hó' occurrences: {price_count}")
+    print(f"  'Ft' occurrences (any context): {len(re.findall('Ft', html))}")
+    print(f"  has <noscript>: {'<noscript' in html.lower()}")
 
-    # Class names that appear right before a price match, as selector candidates.
-    class_hits = re.findall(r'class="([^"]{0,60})"[^<]{0,300}?Ft\s*/\s*h[oó]', html, re.IGNORECASE)
-    print(f"  candidate class attrs near price: {class_hits[:10]}")
+    # Signs of a client-side-rendered / API-driven results grid.
+    for marker in ["window.__", "algolia", "elasticsearch", "apiUrl", "api.alberlet",
+                   "/api/", "graphql", "axios", "fetch(", "data-react", "ng-app", "v-app"]:
+        count = html.lower().count(marker.lower())
+        if count:
+            print(f"  marker {marker!r}: {count} occurrence(s)")
 
-    # Any listing-detail-looking links.
-    hrefs = re.findall(r'href="([^"]*(?:hirdetes|kiado-lakas)[^"]*)"', html, re.IGNORECASE)
-    print(f"  sample hrefs matching listing pattern (first 10 of {len(hrefs)}): {hrefs[:10]}")
+    # Dump script src attributes (external bundles) - helps identify the framework.
+    srcs = re.findall(r'<script[^>]+src="([^"]+)"', html, re.IGNORECASE)
+    print(f"  script src count: {len(srcs)}; sample: {srcs[:8]}")
+
+    # Dump any inline script tag longer than 200 chars (likely app config/bootstrap data).
+    inline_scripts = re.findall(r"<script(?![^>]*\bsrc=)[^>]*>(.*?)</script>", html, re.IGNORECASE | re.DOTALL)
+    long_inline = [s for s in inline_scripts if len(s.strip()) > 200]
+    print(f"  inline <script> blocks: {len(inline_scripts)}, >200 chars: {len(long_inline)}")
+    for s in long_inline[:2]:
+        print("  --- inline script snippet ---")
+        print("  " + s[:500].replace("\n", " "))
+
+    # What's actually in the <body> — first visible text-bearing chunk.
+    body_match = re.search(r"<body[^>]*>(.*)", html, re.IGNORECASE | re.DOTALL)
+    if body_match:
+        body = body_match.group(1)
+        text_only = re.sub(r"<[^>]+>", " ", body)
+        text_only = re.sub(r"\s+", " ", text_only).strip()
+        print(f"  body visible-text length: {len(text_only)}")
+        print(f"  body visible-text sample: {text_only[:500]}")
 
 
 def main():

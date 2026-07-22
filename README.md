@@ -11,7 +11,8 @@ utca, Budapest 1097, but the filters in `scripts/config.py` are just data
 1. **Fetches** current listings from `ingatlan.com`, `alberlet.hu`,
    `flatco.hu` (Metrodom's own property management site), `rentingo.com`,
    `albifigyelo.hu` (a nationwide listing aggregator), `rentola.hu`,
-   `oc.hu` (Otthon Centrum), and `megveszlak.hu`.
+   `oc.hu` (Otthon Centrum), `megveszlak.hu`, and `tappancsosotthon.hu`
+   ("Rent with Paws", a pet-friendly rental agency).
 2. **Filters** for:
    - Address/building keyword match (default: Vágóhíd utca / Metrodom Green)
      — two sources (albifigyelo.hu, megveszlak.hu) only match at district
@@ -152,6 +153,26 @@ wired up as a **district-level watch**
 (`Listing.location_precision = "district"`): it matches on "IX. kerület"
 alone, and every listing from this source is flagged in the email as
 needing manual street confirmation via the source link.
+
+## tappancsosotthon.hu: pet-friendly agency, not an animal shelter
+
+Despite the name ("Tappancsos Otthon" = "Pawed Home" in Hungarian), this
+is a genuine rental listing site — a small Budapest agency ("Rent with
+Paws") specializing in pet-friendly apartment rentals — confirmed by
+inspecting the actual page content before writing anything against it.
+
+It's built on WordPress with the "Essential Real Estate" plugin. The
+homepage renders every published listing directly (no pagination found),
+and each card already shows price, size, room count, and — usefully — the
+actual street name right in the listing title itself (e.g. "VII. Csányi
+utca"), so `scrapers/tappancsosotthon.py` parses everything from one
+request without needing to follow into each listing's detail page.
+
+This agency lists both rentals and sales. Sale listings are skipped via
+their URL slug (reliably containing "elado" = for-sale); as a backstop,
+sale prices are quoted in millions of forints, which the price parser
+used by `MAX_RENT_HUF` doesn't recognize as a rental amount, so one
+slipping past the slug check would still fail the hard price filter.
 
 ## What this deliberately does NOT do: Facebook/Marketplace scraping
 

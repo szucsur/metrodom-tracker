@@ -9,10 +9,11 @@ utca, Budapest 1097, but the filters in `scripts/config.py` are just data
 ## What this does
 
 1. **Fetches** current listings from `ingatlan.com`, `alberlet.hu`,
-   `flatco.hu` (Metrodom's own property management site), and
-   `rentingo.com`.
+   `flatco.hu` (Metrodom's own property management site), `rentingo.com`,
+   and `albifigyelo.hu` (a nationwide listing aggregator).
 2. **Filters** for:
    - Address/building keyword match (default: Vágóhíd utca / Metrodom Green)
+     — one source (albifigyelo.hu) only matches at district level; see below
    - Minimum size and room count (default: 40 sqm, 2 rooms)
    - Furnished status, terrace/balcony, and move-in date, read from the
      listing text where stated (see "Soft filters" below)
@@ -57,6 +58,30 @@ match those too), then follows each into its detail page for
 price/size/rooms/furnished/terrace. This is effectively the landlord's
 own "available now" list, so no district/price filtering is needed —
 every link found is a genuinely open unit.
+
+## albifigyelo.hu: district-level watch, not street-level
+
+albifigyelo.hu is a nationwide rental-listing aggregator — it doesn't
+originate listings itself, it re-publishes ones from other sites
+(each listing is credited with a "Forrás:" / source, e.g. ingatlan.com,
+jofogas.hu, ingatlanbazar.hu, zenga.hu), so it's a useful indirect way to
+see some ingatlan.com-sourced listings even though ingatlan.com itself
+is Cloudflare-blocked.
+
+**Confirmed limitation**: neither the visible page nor the hidden
+schema.org/JSON-LD data on albifigyelo.hu ever exposes a street name —
+only district/neighborhood (e.g. "Budapest, Kelenföld" or "Budapest IX.
+kerület") plus raw GPS coordinates. Reverse-geocoding those coordinates
+to a street would mean depending on a third-party geocoding API for a
+still-fuzzy result, which isn't worth the added complexity here.
+
+So `scrapers/albifigyelo.py` is wired up as a **district-level watch**:
+`Listing.location_precision = "district"` tells `filters.py` to accept a
+plain "IX. kerület" match instead of requiring "Vágóhíd" text. This means
+you'll get emails for **any** qualifying IX. kerület apartment from this
+source, not just Vágóhíd utca specifically — each one is flagged in the
+email body ("district-level match only... click through to confirm")
+so you know to check the source link yourself before getting excited.
 
 ## What this deliberately does NOT do: Facebook/Marketplace scraping
 

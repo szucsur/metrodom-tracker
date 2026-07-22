@@ -11,13 +11,33 @@ import sys
 
 import filters
 from emailer import send_email
-from scrapers import ingatlan, alberlet, facebook, flatco, rentingo, albifigyelo, rentola
+from scrapers import (
+    ingatlan,
+    alberlet,
+    facebook,
+    flatco,
+    rentingo,
+    albifigyelo,
+    rentola,
+    oc,
+    megveszlak,
+)
 from state import load_seen, save_seen
 
 
 def gather_all_listings():
     listings = []
-    for scraper in (ingatlan, alberlet, facebook, flatco, rentingo, albifigyelo, rentola):
+    for scraper in (
+        ingatlan,
+        alberlet,
+        facebook,
+        flatco,
+        rentingo,
+        albifigyelo,
+        rentola,
+        oc,
+        megveszlak,
+    ):
         try:
             found = scraper.fetch()
             print(f"[{scraper.__name__}] fetched {len(found)} listing(s)")

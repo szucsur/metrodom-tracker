@@ -10,10 +10,12 @@ utca, Budapest 1097, but the filters in `scripts/config.py` are just data
 
 1. **Fetches** current listings from `ingatlan.com`, `alberlet.hu`,
    `flatco.hu` (Metrodom's own property management site), `rentingo.com`,
-   `albifigyelo.hu` (a nationwide listing aggregator), and `rentola.hu`.
+   `albifigyelo.hu` (a nationwide listing aggregator), `rentola.hu`,
+   `oc.hu` (Otthon Centrum), and `megveszlak.hu`.
 2. **Filters** for:
    - Address/building keyword match (default: Vágóhíd utca / Metrodom Green)
-     — one source (albifigyelo.hu) only matches at district level; see below
+     — two sources (albifigyelo.hu, megveszlak.hu) only match at district
+     level; see below
    - Minimum size and room count (default: 40 sqm, 2 rooms)
    - Furnished status, terrace/balcony, and move-in date, read from the
      listing text where stated (see "Soft filters" below)
@@ -102,6 +104,51 @@ brand new listing could be sorted past the first page before an hourly
 check catches it; no site-side sort/newest-first parameter was found
 during inspection.
 
+## oc.hu: parsed from its embedded search-widget JSON
+
+oc.hu (Otthon Centrum, a nationwide agency franchise) is not
+Cloudflare-blocked, but its rental search page is built with Symfony UX
+Live Components — plain query-string parameters on the URL don't filter
+anything (confirmed: the total result count stayed identical regardless
+of what was appended). Driving the real search form in a headless browser
+once (diagnostic only, not part of the production scraper) showed it
+actually navigates to a plain GET URL using semicolon/tilde path
+segments, e.g.:
+
+```
+https://www.oc.hu/ingatlanok/lista/ertekesites:kiado;meret:40~;szoba:2~
+```
+
+That URL is server-rendered and fetchable with a plain `requests.get()` —
+no browser needed at runtime. Each listing card also embeds its full
+record (price, size, rooms, a free-text description) as an HTML-escaped
+JSON blob in a `data-live-props-value` attribute, which `scrapers/oc.py`
+parses directly instead of scraping visible card text.
+
+oc.hu's own structured location field is only ever district/city-level
+(e.g. "Budapest III. kerület" / "Aranyhegy") — but the free-text
+description is agent-written prose that in every sample listing inspected
+named the actual street or landmark, so this is wired up as an "exact"
+source like alberlet.hu: a match still requires the street name itself to
+appear somewhere in the combined text.
+
+## megveszlak.hu: district-level watch, not street-level
+
+megveszlak.hu is a large nationwide listing aggregator (160k+ listings
+site-wide). Its per-district rental list page
+(`https://megveszlak.hu/alberlet-budapest-ix-kerulet`, using the same
+`config.ALBERLET_DISTRICT_CODE` as alberlet.hu) is plain server-rendered
+HTML, no Cloudflare block.
+
+**Confirmed limitation**: neither the list page nor an individual
+listing's detail page ever exposes a street name — only the district and
+neighborhood (e.g. "Albérlet (lakás) Budapest V. kerület, Belváros"), no
+JSON-LD, no coordinates. So exactly like albifigyelo.hu, this source is
+wired up as a **district-level watch**
+(`Listing.location_precision = "district"`): it matches on "IX. kerület"
+alone, and every listing from this source is flagged in the email as
+needing manual street confirmation via the source link.
+
 ## What this deliberately does NOT do: Facebook/Marketplace scraping
 
 Facebook's Terms of Service prohibit automated data collection from its
@@ -177,3 +224,9 @@ Edit `scripts/config.py`:
   parses that directly rather than relying on CSS classes, which should
   hold up better across redesigns. If a run starts returning 0 listings
   here, check the Actions log for the actual HTTP status/error first.
+- `oc.hu` is verified working: its search results page embeds a JSON blob
+  per listing card (`data-live-props-value`), which `oc.py` parses
+  directly rather than scraping visible card markup.
+- `megveszlak.hu` is verified working: its per-district list page is
+  plain server-rendered HTML, parsed via listing-card CSS classes
+  (`hirdetes_item_ar`/`hirdetes_item_cim`/`hirdetes_item_meretekdiv`).

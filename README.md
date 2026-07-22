@@ -21,6 +21,16 @@ utca, Budapest 1097, but the filters in `scripts/config.py` are just data
    (`.github/workflows/tracker.yml`) on GitHub's hosted runners, so it
    doesn't depend on any particular machine or session staying alive.
 
+## ingatlan.com is blocked by Cloudflare — use its native alerts instead
+
+Confirmed directly (not guessed): ingatlan.com sits behind a Cloudflare
+bot-challenge page that returns HTTP 403 to automated requests, including
+from GitHub Actions runners. `scripts/scrapers/ingatlan.py` still tries
+each run in case that changes, but expect it to consistently return zero
+listings — getting past it would require the same kind of anti-bot
+evasion this project deliberately avoids for Facebook (see below).
+**Use ingatlan.com's own saved-search email alerts** for that source.
+
 ## What this deliberately does NOT do: Facebook/Marketplace scraping
 
 Facebook's Terms of Service prohibit automated data collection from its
@@ -82,11 +92,14 @@ Edit `scripts/config.py`:
 
 ## Notes on reliability
 
-`ingatlan.com` and `alberlet.hu` change their page markup over time.
-`scripts/scrapers/ingatlan.py` parses the site's embedded JSON data first
-(more stable across redesigns) and falls back to a CSS-selector scrape;
-`scripts/scrapers/alberlet.py` uses CSS selectors directly. If a run
-starts returning 0 listings from a source that normally has results, the
-site's markup likely changed — check the Actions log (or run
-`--dry-run` locally) and inspect the source's current HTML to update the
-selectors.
+- `ingatlan.com` is Cloudflare-blocked (see above) — 0 listings from this
+  source is expected, not a bug.
+- `alberlet.hu` is verified working: a plain HTTP GET to
+  `https://www.alberlet.hu/kiado-alberlet?ingatlan-tipus=lakas&kerulet=ix&meret=40-x-m2&szoba=2-x&keres=normal&limit=24`
+  returns full server-rendered listings, no browser needed. Each listing's
+  detail-page URL is a self-describing slug (e.g.
+  `/kiado-alberlet/budapest-IX-kerulet-vagohid-utca-65m2-3-szoba_779416`)
+  that encodes district, street, size, and room count — `alberlet.py`
+  parses that directly rather than relying on CSS classes, which should
+  hold up better across redesigns. If a run starts returning 0 listings
+  here, check the Actions log for the actual HTTP status/error first.

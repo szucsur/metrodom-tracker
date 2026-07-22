@@ -21,6 +21,9 @@ LOCATION_HINTS = ["1097", "ix. ker", "ix.ker", "budapest ix"]
 MIN_SIZE_SQM = 40
 MIN_ROOMS = 2
 
+# alberlet.hu district code for its search URL (Budapest IX. kerület).
+ALBERLET_DISTRICT_CODE = "ix"
+
 # Keywords (case-insensitive, Hungarian) used to detect furnishing status.
 FURNISHED_KEYWORDS = ["bútorozott", "butorozott", "berendezett", "felszerelt"]
 PARTIALLY_FURNISHED_KEYWORDS = ["részben bútorozott", "reszben butorozott"]

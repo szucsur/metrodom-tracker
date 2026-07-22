@@ -1,12 +1,23 @@
 """Scraper for ingatlan.com search results.
 
-ingatlan.com embeds its search results as JSON inside a `<script
-id="__NEXT_DATA__">` tag (it's a Next.js app), which is far more stable
-to parse than CSS classes that change with every redesign. This module
-tries that first and falls back to a best-effort HTML card parse if the
-JSON shape has changed — in which case this file will need updating to
-match the current markup (check the page source and adjust the
-NEXT_DATA path or the CSS selectors in `_parse_html_fallback`).
+Confirmed (via direct GitHub Actions runner requests, not just guessing):
+ingatlan.com sits behind a Cloudflare bot-challenge page ("Csak egy
+gyors ellenőrzés") that returns HTTP 403 to plain requests, including
+from GitHub-hosted runner IPs. This isn't a wrong-URL or missing-header
+problem — it's an active anti-bot wall, and getting past it reliably
+would require the same kind of anti-bot evasion (headless-browser
+fingerprint spoofing to pass the challenge) this project deliberately
+avoids for Facebook too. This module still attempts a plain request
+each run — in case Cloudflare's rules change — but expect it to
+consistently return zero listings.
+
+**For ingatlan.com coverage, use its own saved-search email alerts
+instead**: run the search on the site, save it, and enable notifications.
+
+If it ever does get past the challenge, results are parsed from the
+`<script id="__NEXT_DATA__">` JSON blob (Next.js app state), which is
+more stable across redesigns than CSS classes; `_parse_html_fallback`
+is a best-effort backup if that JSON shape changes.
 """
 
 import json

@@ -24,6 +24,13 @@ MIN_ROOMS = 2
 # alberlet.hu district code for its search URL (Budapest IX. kerület).
 ALBERLET_DISTRICT_CODE = "ix"
 
+# flatco.hu is Metrodom's own management site and lists several
+# buildings (Metrodom River, Green, Park, Panoráma...) — this must be
+# the exact building name so flatco.py doesn't also pick up other
+# Metrodom buildings' units (bare "metrodom" in ADDRESS_KEYWORDS is too
+# loose for that comparison).
+FLATCO_BUILDING_NAME = "metrodom green"
+
 # Keywords (case-insensitive, Hungarian) used to detect furnishing status.
 FURNISHED_KEYWORDS = ["bútorozott", "butorozott", "berendezett", "felszerelt"]
 PARTIALLY_FURNISHED_KEYWORDS = ["részben bútorozott", "reszben butorozott"]

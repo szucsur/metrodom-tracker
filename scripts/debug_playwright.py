@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
-"""One-off diagnostic: render alberlet.hu with a real browser (Playwright)
-and report what actually shows up, since the plain-HTTP fetch returned a
-page with no visible listing content. Not part of the regular tracker run."""
+"""One-off diagnostic: drive alberlet.hu's own homepage search UI with a
+real browser to find the correct search-results URL, since the guessed
+URL path turned out to be the site's own "page not found" page (a soft
+404 that still returns HTTP 200). Not part of the regular tracker run."""
 
 import re
 
 from playwright.sync_api import sync_playwright
 
-URL = "https://www.alberlet.hu/kiado-lakas/budapest-ix-kerulet"
+HOME_URL = "https://www.alberlet.hu/"
 
 
 def main():
@@ -17,34 +18,51 @@ def main():
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
             "(KHTML, like Gecko) Chrome/124.0 Safari/537.36"
         ))
-        page.goto(URL, wait_until="networkidle", timeout=30000)
-        # Give any lazy-loaded content a moment past networkidle.
-        page.wait_for_timeout(2000)
+        page.goto(HOME_URL, wait_until="networkidle", timeout=30000)
 
-        html = page.content()
-        print(f"rendered HTML length: {len(html)}")
+        # Dismiss cookie banner if present.
+        for text in ["Elfogadom", "Rendben", "Accept"]:
+            try:
+                btn = page.get_by_text(text, exact=False).first
+                if btn.is_visible(timeout=1000):
+                    btn.click(timeout=1000)
+                    page.wait_for_timeout(500)
+                    break
+            except Exception:
+                pass
 
-        visible_text = page.inner_text("body")
-        visible_text = re.sub(r"\s+", " ", visible_text).strip()
-        print(f"visible text length: {len(visible_text)}")
-        print(f"visible text sample (first 1500 chars): {visible_text[:1500]}")
+        print("=== forms on homepage ===")
+        forms = page.eval_on_selector_all("form", """els => els.map(f => ({
+            action: f.getAttribute('action'),
+            method: f.getAttribute('method'),
+            id: f.id,
+            cls: f.className
+        }))""")
+        for f in forms:
+            print(f"  form: {f}")
 
-        ft_count = len(re.findall(r"Ft", visible_text))
-        print(f"'Ft' occurrences in visible text: {ft_count}")
-        for m in list(re.finditer(r".{80}Ft.{40}", visible_text))[:5]:
-            print(f"  context: {m.group(0)}")
+        print("=== inputs/selects on homepage ===")
+        inputs = page.eval_on_selector_all("input, select", """els => els.map(e => ({
+            tag: e.tagName,
+            type: e.getAttribute('type'),
+            name: e.getAttribute('name'),
+            id: e.id,
+            placeholder: e.getAttribute('placeholder'),
+            cls: e.className
+        }))""")
+        for i in inputs[:40]:
+            print(f"  {i}")
 
-        hrefs = page.eval_on_selector_all("a[href]", "els => els.map(e => e.getAttribute('href'))")
-        listing_hrefs = [h for h in hrefs if h and re.search(r"/\d{4,}", h)]
-        print(f"total <a href> count: {len(hrefs)}; numeric-id-looking hrefs: {len(listing_hrefs)}")
-        print(f"sample listing-looking hrefs: {listing_hrefs[:10]}")
-
-        # Common card container class name candidates, count how many elements match.
-        for sel in [".listing", ".list-item", ".property", ".card", "article",
-                    "[class*='listing']", "[class*='result']", "[class*='item']"]:
-            count = page.eval_on_selector_all(sel, "els => els.length")
-            if count:
-                print(f"selector {sel!r}: {count} element(s)")
+        # Try to find a location/search text input and type into it.
+        candidates = [i for i in inputs if i.get("tag") == "INPUT" and (
+            (i.get("placeholder") or "").lower().find("kerül") >= 0
+            or (i.get("placeholder") or "").lower().find("hol") >= 0
+            or (i.get("placeholder") or "").lower().find("cím") >= 0
+            or (i.get("placeholder") or "").lower().find("keres") >= 0
+            or (i.get("name") or "").lower().find("locat") >= 0
+            or (i.get("name") or "").lower().find("hely") >= 0
+        )]
+        print(f"=== candidate location input(s): {candidates}")
 
         browser.close()
 

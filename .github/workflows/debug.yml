@@ -12,6 +12,11 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install dependencies
-        run: pip install -r requirements.txt
-      - name: Debug fetch
+        run: |
+          pip install -r requirements.txt
+          pip install playwright
+          playwright install --with-deps chromium
+      - name: Debug fetch (megveszlak.hu recon)
         run: python scripts/debug_fetch.py
+      - name: Debug render with Playwright (oc.hu search flow)
+        run: python scripts/debug_playwright.py

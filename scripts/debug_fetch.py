@@ -1,12 +1,9 @@
 """Temporary diagnostic script for GitHub Actions — not part of the tracker.
 
-Round 3: the working rental search URL is
-https://www.oc.hu/index.php/ingatlanok/lista/ertekesites:kiado (chaining
-more path segments like /tipus:lakas redirects away and loses the "kiado"
-filter, so filtering must happen in Python like every other source here).
-This round dumps the raw HTML around each listing-card anchor on that page
-to find price/size/room/address markup, and fetches one real rental detail
-page (H521686) to see its structure.
+This round: initial reconnaissance of megveszlak.hu (brand new source, not
+yet investigated at all) — status code, title, Cloudflare check, JSON-LD,
+and candidate listing link patterns, same first pass used for every other
+source in this project.
 """
 
 import re
@@ -22,64 +19,70 @@ HEADERS = {
     "Accept-Language": "hu-HU,hu;q=0.9,en;q=0.8",
 }
 
-LIST_URL = "https://www.oc.hu/index.php/ingatlanok/lista/ertekesites:kiado"
-DETAIL_URL = "https://www.oc.hu/ingatlanok/H521686"
+CANDIDATE_URLS = [
+    "https://www.megveszlak.hu/",
+    "https://megveszlak.hu/",
+]
 
 
-def fetch(url):
-    resp = requests.get(url, headers=HEADERS, timeout=20)
-    resp.raise_for_status()
-    return resp.text
-
-
-def dump_list_page():
+def dump(url):
     print("=" * 80)
-    print(f"GET {LIST_URL}")
-    html = fetch(LIST_URL)
+    print(f"GET {url}")
+    try:
+        resp = requests.get(url, headers=HEADERS, timeout=20, allow_redirects=True)
+    except requests.RequestException as exc:
+        print(f"REQUEST FAILED: {exc}")
+        return
+    print(f"status={resp.status_code} final_url={resp.url}")
+    print(f"server={resp.headers.get('server')}")
+    html = resp.text
     print(f"content length: {len(html)}")
 
-    # Find all listing card anchors and print a window of HTML around each
-    for match in re.finditer(r'href="(/ingatlanok/H\d+)"', html):
-        start = max(0, match.start() - 200)
-        end = min(len(html), match.end() + 900)
-        print("-" * 60)
-        print(html[start:end])
-
-    # look for a repeating card container class name
-    class_matches = re.findall(r'class="([^"]*card[^"]*)"', html, re.IGNORECASE)
-    print(f"classes containing 'card' (sample): {class_matches[:10]}")
-    result_classes = re.findall(r'class="([^"]*result[^"]*)"', html, re.IGNORECASE)
-    print(f"classes containing 'result' (sample): {result_classes[:10]}")
-
-    # pagination clues
-    page_hrefs = re.findall(r'href="([^"]*oldal[^"]*)"', html, re.IGNORECASE)
-    print(f"pagination-like hrefs (sample): {page_hrefs[:10]}")
-    total_count = re.findall(r'(\d+)\s*(?:db|találat)', html, re.IGNORECASE)
-    print(f"possible result-count numbers: {total_count[:10]}")
-
-
-def dump_detail_page():
-    print("=" * 80)
-    print(f"GET {DETAIL_URL}")
-    html = fetch(DETAIL_URL)
-    print(f"content length: {len(html)}")
     title_match = re.search(r"<title>(.*?)</title>", html, re.IGNORECASE | re.DOTALL)
     print(f"title: {title_match.group(1).strip() if title_match else 'NONE'}")
 
-    # dump JSON-LD blocks with @type != FAQPage
-    ldjson_blocks = re.findall(r'<script type="application/ld\+json">(.*?)</script>', html, re.DOTALL)
-    for i, block in enumerate(ldjson_blocks):
-        if "FAQPage" not in block:
-            print(f"non-FAQ JSON-LD block[{i}] (first 1000 chars): {block.strip()[:1000]}")
+    print(f"'cloudflare' in headers: {'cloudflare' in str(resp.headers).lower()}")
+    print(f"'Just a moment' in html: {'Just a moment' in html}")
+    print(f"'Attention Required' in html: {'Attention Required' in html}")
 
-    # print context around price / address / size / rooms
-    for keyword in ["Ft/hó", "cím", "Cím", "Terület", "Szobák", "szoba"]:
-        idx = html.find(keyword)
-        if idx != -1:
-            print(f"--- context around '{keyword}' ---")
-            print(html[max(0, idx - 200):idx + 300])
+    ldjson_blocks = re.findall(r'<script type="application/ld\+json">(.*?)</script>', html, re.DOTALL)
+    print(f"JSON-LD script blocks found: {len(ldjson_blocks)}")
+    for i, block in enumerate(ldjson_blocks[:3]):
+        print(f"  block[{i}] first 300 chars: {block.strip()[:300]}")
+
+    next_data = re.search(r'<script id="__NEXT_DATA__"[^>]*>(.*?)</script>', html, re.DOTALL)
+    print(f"__NEXT_DATA__ present: {bool(next_data)}")
+
+    print(f"'kiad' (case-insens) occurrences: {html.lower().count('kiad')}")
+    print(f"'elad' (case-insens) occurrences: {html.lower().count('elad')}")
+    print(f"'bérl' (case-insens) occurrences: {html.lower().count('bérl')}")
+    print(f"'m²' occurrences: {html.count('m²')}")
+    print(f"'szoba' occurrences: {html.lower().count('szoba')}")
+
+    hrefs = re.findall(r'href="([^"]+)"', html)
+    print(f"total hrefs: {len(hrefs)}")
+    listing_like = [h for h in hrefs if re.search(r"/\d{4,}", h)]
+    print(f"digit-ID-like hrefs (sample up to 15):")
+    seen = set()
+    count = 0
+    for h in listing_like:
+        if h in seen:
+            continue
+        seen.add(h)
+        print(f"  {h}")
+        count += 1
+        if count >= 15:
+            break
+
+    forms = re.findall(r"<form[^>]*action=\"([^\"]*)\"[^>]*>", html)
+    print(f"form actions found: {forms[:10]}")
+
+    nav_search_links = [h for h in hrefs if "kiad" in h.lower() or "berl" in h.lower()]
+    print(f"nav links containing 'kiad'/'berl' (sample up to 10):")
+    for h in nav_search_links[:10]:
+        print(f"  {h}")
 
 
 if __name__ == "__main__":
-    dump_list_page()
-    dump_detail_page()
+    for url in CANDIDATE_URLS:
+        dump(url)

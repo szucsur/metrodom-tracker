@@ -10,7 +10,7 @@ utca, Budapest 1097, but the filters in `scripts/config.py` are just data
 
 1. **Fetches** current listings from `ingatlan.com`, `alberlet.hu`,
    `flatco.hu` (Metrodom's own property management site), `rentingo.com`,
-   and `albifigyelo.hu` (a nationwide listing aggregator).
+   `albifigyelo.hu` (a nationwide listing aggregator), and `rentola.hu`.
 2. **Filters** for:
    - Address/building keyword match (default: Vágóhíd utca / Metrodom Green)
      — one source (albifigyelo.hu) only matches at district level; see below
@@ -82,6 +82,25 @@ you'll get emails for **any** qualifying IX. kerület apartment from this
 source, not just Vágóhíd utca specifically — each one is flagged in the
 email body ("district-level match only... click through to confirm")
 so you know to check the source link yourself before getting excited.
+
+## rentola.hu: full street-level data via JSON-LD
+
+rentola.hu (Hungarian edition of an international rental platform) embeds
+every listing on its Budapest apartments page as clean schema.org
+JSON-LD (`SearchResultsPage` → `ItemList` → `RealEstateListing`),
+including a real `streetAddress` field, `floorSize`, `numberOfBedrooms`,
+price/currency, and a `validFrom` timestamp. `scrapers/rentola.py` parses
+that JSON directly rather than scraping HTML card markup — the most
+robust of all the sources here, and the only one besides alberlet.hu
+that gets exact street-level matching without any caveats.
+
+One thing worth knowing: the page's default sort is "Ajánlott"
+(Recommended), not strictly newest-first, and only the first batch of
+listings (~10-20) is present in the initial page load — no pagination is
+followed. Since a Vágóhíd utca match is rare, there's a small chance a
+brand new listing could be sorted past the first page before an hourly
+check catches it; no site-side sort/newest-first parameter was found
+during inspection.
 
 ## What this deliberately does NOT do: Facebook/Marketplace scraping
 

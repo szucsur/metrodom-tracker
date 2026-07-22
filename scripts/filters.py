@@ -33,7 +33,7 @@ def location_matches(listing: Listing) -> bool:
         return text_matches_any(haystack, config.LOCATION_HINTS)
     return (
         text_matches_any(haystack, config.LOCATION_HINTS)
-        and text_matches_any(haystack, ["vágóhíd", "vagohid", "metrodom"])
+        and text_matches_any(haystack, ["vágóhíd", "vagohid", "metrodom green"])
     )
 
 

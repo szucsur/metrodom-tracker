@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""One-off diagnostic: look for an underlying API/AJAX endpoint behind
-albifigyelo.hu's filter UI (price/rooms/area inputs have no `name`
-attrs, suggesting JS-driven filtering), and count how many listing
-cards are actually present in the raw HTML vs. loaded dynamically.
-Not part of the regular tracker run."""
+"""One-off diagnostic: check whether albifigyelo.hu exposes a
+street-level address anywhere in a listing detail page's raw HTML
+(schema.org address, meta tags, map data attributes, etc.), since the
+visible text only ever showed district-level location. Not part of the
+regular tracker run."""
 
 import re
 
@@ -20,35 +20,24 @@ HEADERS = {
 
 
 def main():
-    resp = requests.get("https://albifigyelo.hu/kiado-alberletek/budapest", headers=HEADERS, timeout=20)
+    resp = requests.get("https://albifigyelo.hu/hirdetesek/58206719", headers=HEADERS, timeout=20)
     html = resp.text
     print(f"status: {resp.status_code}; length: {len(html)}")
 
-    # Count actual listing detail hrefs present in raw HTML.
-    hrefs = set(re.findall(r'href="(https://albifigyelo\.hu/hirdetesek/\d+)"', html))
-    print(f"unique listing hrefs in raw HTML: {len(hrefs)}")
-
-    # Look for API/AJAX/JSON config markers.
-    for marker in ["api.albifigyelo", "/api/", "fetch(", "axios", "window.__", "data-api",
-                   "application/json", "graphql", "algolia", "meilisearch", "typesense"]:
+    for marker in ["streetAddress", "PostalAddress", "utca", "\"address\"", "geo", "latitude",
+                   "data-lat", "data-lng", "og:street", "cim", "vágóhíd", "vagohid"]:
         count = html.lower().count(marker.lower())
         if count:
             print(f"marker {marker!r}: {count} occurrence(s)")
+            idx = html.lower().find(marker.lower())
+            print(f"  context: ...{html[max(0,idx-150):idx+150]}...")
 
-    # Dump inline script blocks that look like config (contain 'kerulet' or 'district' or 'filter').
-    scripts = re.findall(r"<script(?![^>]*\bsrc=)[^>]*>(.*?)</script>", html, re.IGNORECASE | re.DOTALL)
-    print(f"inline script blocks: {len(scripts)}")
+    # Dump all JSON-LD script blocks in full (small enough to be useful).
+    scripts = re.findall(r'<script type="application/ld\+json">(.*?)</script>', html, re.DOTALL)
+    print(f"JSON-LD blocks: {len(scripts)}")
     for s in scripts:
-        if re.search(r"kerulet|district|filter|api", s, re.IGNORECASE) and len(s.strip()) > 100:
-            print("--- relevant inline script snippet (first 800 chars) ---")
-            print(s.strip()[:800])
-
-    # Dump external script src attributes (helps spot the framework/bundle).
-    srcs = re.findall(r'<script[^>]+src="([^"]+)"', html, re.IGNORECASE)
-    print(f"script src count: {len(srcs)}")
-    for s in srcs:
-        if "albifigyelo" in s or s.startswith("/"):
-            print(f"  {s}")
+        print("--- JSON-LD ---")
+        print(s.strip()[:1500])
 
 
 if __name__ == "__main__":

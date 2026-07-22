@@ -1,9 +1,11 @@
 """Temporary diagnostic script for GitHub Actions — not part of the tracker.
 
-Fetches oc.hu search/listing pages and dumps structural clues (status code,
-title, presence of JSON-LD, candidate listing links, price/size/room text
-patterns) so we can figure out the real search URL and markup shape before
-writing a production scraper.
+Round 2: oc.hu's homepage confirmed reachable (not Cloudflare-blocked), with
+a search form posting to /index.php/ingatlanok/kereses and a rental listing
+nav link /index.php/ingatlanok/lista/ertekesites:kiado. Individual listings
+look like /ingatlanok/H521592. This round probes the rental list URL (with
+and without district/query params) and a couple of listing detail pages to
+see actual markup shape.
 """
 
 import re
@@ -20,11 +22,11 @@ HEADERS = {
 }
 
 CANDIDATE_URLS = [
-    "https://www.oc.hu/",
-    "https://www.oc.hu/kiado-lakas/budapest-ix-kerulet",
-    "https://www.oc.hu/lakas-kiado/budapest-ix-kerulet",
-    "https://www.oc.hu/kiado-ingatlan/lakas/budapest-ix-kerulet",
-    "https://www.oc.hu/ingatlanok/kiado/lakas/budapest/ix-kerulet",
+    "https://www.oc.hu/index.php/ingatlanok/lista/ertekesites:kiado",
+    "https://www.oc.hu/index.php/ingatlanok/lista/ertekesites:kiado/tipus:lakas",
+    "https://www.oc.hu/index.php/ingatlanok/lista/ertekesites:kiado/tipus:lakas/telepules:budapest",
+    "https://www.oc.hu/index.php/ingatlanok/kereses?ertekesites=kiado&tipus=lakas&telepules=budapest&kerulet=9",
+    "https://www.oc.hu/ingatlanok/H521592",
 ]
 
 
@@ -37,38 +39,30 @@ def dump(url):
         print(f"REQUEST FAILED: {exc}")
         return
     print(f"status={resp.status_code} final_url={resp.url}")
-    print(f"server={resp.headers.get('server')}")
     html = resp.text
     print(f"content length: {len(html)}")
 
     title_match = re.search(r"<title>(.*?)</title>", html, re.IGNORECASE | re.DOTALL)
     print(f"title: {title_match.group(1).strip() if title_match else 'NONE'}")
 
-    print(f"'cloudflare' in headers: {'cloudflare' in str(resp.headers).lower()}")
-    print(f"'Just a moment' in html: {'Just a moment' in html}")
-    print(f"'Attention Required' in html: {'Attention Required' in html}")
-
     ldjson_blocks = re.findall(r'<script type="application/ld\+json">(.*?)</script>', html, re.DOTALL)
     print(f"JSON-LD script blocks found: {len(ldjson_blocks)}")
-    for i, block in enumerate(ldjson_blocks[:3]):
-        print(f"  block[{i}] first 300 chars: {block.strip()[:300]}")
-
-    next_data = re.search(r'<script id="__NEXT_DATA__"[^>]*>(.*?)</script>', html, re.DOTALL)
-    print(f"__NEXT_DATA__ present: {bool(next_data)}")
-    if next_data:
-        print(f"  first 500 chars: {next_data.group(1)[:500]}")
+    for i, block in enumerate(ldjson_blocks):
+        types = re.findall(r'"@type"\s*:\s*"([^"]+)"', block)
+        print(f"  block[{i}] @type values: {types[:5]} (len={len(block)})")
 
     print(f"'Ft/hó' occurrences: {html.count('Ft/hó')}")
     print(f"'Ft /hó' occurrences: {html.count('Ft /hó')}")
+    print(f"'/hó' occurrences: {html.count('/hó')}")
     print(f"'m²' occurrences: {html.count('m²')}")
     print(f"'szoba' occurrences: {html.lower().count('szoba')}")
     print(f"'vágóhíd' (case-insens) occurrences: {html.lower().count('vágóhíd')}")
     print(f"'metrodom' (case-insens) occurrences: {html.lower().count('metrodom')}")
+    print(f"'ix. ker' (case-insens) occurrences: {html.lower().count('ix. ker')}")
 
-    # Candidate listing links: hrefs containing digits (typical listing ID pattern)
     hrefs = re.findall(r'href="([^"]+)"', html)
-    listing_like = [h for h in hrefs if re.search(r"/\d{4,}", h) or "ingatlan" in h.lower()]
-    print(f"total hrefs: {len(hrefs)}, listing-like hrefs (sample up to 15):")
+    listing_like = [h for h in hrefs if re.search(r"/ingatlanok/H\d+", h)]
+    print(f"total hrefs: {len(hrefs)}, /ingatlanok/H* hrefs found: {len(listing_like)} (sample up to 10):")
     seen = set()
     count = 0
     for h in listing_like:
@@ -77,17 +71,18 @@ def dump(url):
         seen.add(h)
         print(f"  {h}")
         count += 1
-        if count >= 15:
+        if count >= 10:
             break
 
-    # Look for a site search form / nav to guess the real search URL
-    forms = re.findall(r"<form[^>]*action=\"([^\"]*)\"[^>]*>", html)
-    print(f"form actions found: {forms[:10]}")
+    # Look for query-string / pagination hints, filter widget option values
+    kerulet_options = re.findall(r'value="(9|IX)"[^>]*>([^<]{0,40})', html)
+    print(f"possible kerulet=9/IX option matches: {kerulet_options[:5]}")
 
-    nav_search_links = [h for h in hrefs if "kiado" in h.lower() and "lakas" in h.lower()]
-    print(f"nav links containing 'kiado' + 'lakas' (sample up to 10):")
-    for h in nav_search_links[:10]:
-        print(f"  {h}")
+    # dump a text snippet around first szoba/m2 occurrence for card structure clues
+    idx = html.lower().find("szoba")
+    if idx != -1:
+        print("context around first 'szoba':")
+        print(html[max(0, idx - 300):idx + 300])
 
 
 if __name__ == "__main__":

@@ -17,6 +17,10 @@ utca, Budapest 1097, but the filters in `scripts/config.py` are just data
      — two sources (albifigyelo.hu, megveszlak.hu) only match at district
      level; see below
    - Minimum size and room count (default: 40 sqm, 2 rooms)
+   - Maximum monthly rent (default: 300,000 HUF) — a hard cap applied
+     across every source; a listing whose price can't be parsed from its
+     source's text is excluded rather than shown unconfirmed, since this
+     is a budget limit, not a soft preference
    - Furnished status, terrace/balcony, and move-in date, read from the
      listing text where stated (see "Soft filters" below)
 3. **Deduplicates** against `data/seen_listings.json` so the same listing
@@ -204,6 +208,7 @@ Edit `scripts/config.py`:
 
 - `ADDRESS_KEYWORDS` / `LOCATION_HINTS` — what text identifies a match
 - `MIN_SIZE_SQM`, `MIN_ROOMS` — hard size/room filters
+- `MAX_RENT_HUF` — hard maximum monthly rent, in HUF
 - `ALBERLET_DISTRICT_CODE` — district code for alberlet.hu's search URL
 - `FLATCO_BUILDING_NAME` — exact building name flatco.py watches for
   (only relevant if you're tracking a Metrodom-managed building)

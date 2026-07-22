@@ -21,6 +21,11 @@ LOCATION_HINTS = ["1097", "ix. ker", "ix.ker", "budapest ix"]
 MIN_SIZE_SQM = 40
 MIN_ROOMS = 2
 
+# Hard cap on monthly rent, in HUF. A listing whose price can't be parsed
+# from its source text is treated as failing this filter (never shown),
+# not "unconfirmed" — this is a hard budget limit, not a soft preference.
+MAX_RENT_HUF = 300_000
+
 # alberlet.hu district code for its search URL (Budapest IX. kerület).
 ALBERLET_DISTRICT_CODE = "ix"
 

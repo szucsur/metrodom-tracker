@@ -45,6 +45,48 @@ def rooms_ok(listing: Listing) -> bool:
     return listing.rooms is not None and listing.rooms >= config.MIN_ROOMS
 
 
+# Matches a HUF amount followed by a thousand-forint shorthand, e.g.
+# "180e Ft" (oc.hu) or "180 ezer Ft" -> 180 * 1000.
+_PRICE_THOUSAND_RE = re.compile(r"(\d[\d\s.,]*)\s*e(?:zer)?\s*(?:ft|huf)\b", re.IGNORECASE)
+# Matches a plain HUF amount, e.g. "220 000 Ft/hó" or "220000 HUF/hónap".
+_PRICE_PLAIN_RE = re.compile(r"(\d[\d\s.,]*)\s*(?:ft|huf)\b", re.IGNORECASE)
+_DIGITS_ONLY_RE = re.compile(r"^[\d\s.,]+$")
+
+
+def parse_price_huf(price_text: str) -> Optional[float]:
+    """Best-effort HUF amount extraction across all sources' price text
+    formats. Returns None if the text is empty, is denominated in a
+    non-HUF currency, or doesn't contain a recognizable amount."""
+    text = (price_text or "").strip()
+    if not text:
+        return None
+    if "€" in text or "eur" in text.lower():
+        return None  # not HUF-denominated; can't compare against a HUF cap
+
+    match = _PRICE_THOUSAND_RE.search(text)
+    if match:
+        digits = re.sub(r"[^\d]", "", match.group(1))
+        return float(digits) * 1000 if digits else None
+
+    match = _PRICE_PLAIN_RE.search(text)
+    if match:
+        digits = re.sub(r"[^\d]", "", match.group(1))
+        return float(digits) if digits else None
+
+    if _DIGITS_ONLY_RE.match(text):
+        # No currency token at all (e.g. a raw numeric price field) —
+        # assume it's already a plain HUF amount.
+        digits = re.sub(r"[^\d]", "", text)
+        return float(digits) if digits else None
+
+    return None
+
+
+def price_ok(listing: Listing) -> bool:
+    price_huf = parse_price_huf(listing.price_text)
+    return price_huf is not None and price_huf <= config.MAX_RENT_HUF
+
+
 def detect_furnished(text: str) -> Optional[str]:
     text = (text or "").lower()
     if text_matches_any(text, config.PARTIALLY_FURNISHED_KEYWORDS):
@@ -89,7 +131,12 @@ def annotate(listing: Listing) -> Listing:
 
 
 def passes_hard_filters(listing: Listing) -> bool:
-    return location_matches(listing) and size_ok(listing) and rooms_ok(listing)
+    return (
+        location_matches(listing)
+        and size_ok(listing)
+        and rooms_ok(listing)
+        and price_ok(listing)
+    )
 
 
 def passes_soft_filters(listing: Listing) -> bool:

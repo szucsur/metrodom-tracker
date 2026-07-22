@@ -46,14 +46,16 @@ def inspect_alberlet_cards(html: str):
         print("  --- inline script snippet ---")
         print("  " + s[:500].replace("\n", " "))
 
-    # What's actually in the <body> — first visible text-bearing chunk.
-    body_match = re.search(r"<body[^>]*>(.*)", html, re.IGNORECASE | re.DOTALL)
-    if body_match:
-        body = body_match.group(1)
-        text_only = re.sub(r"<[^>]+>", " ", body)
-        text_only = re.sub(r"\s+", " ", text_only).strip()
-        print(f"  body visible-text length: {len(text_only)}")
-        print(f"  body visible-text sample: {text_only[:500]}")
+    # Algolia config is usually inline nearby as appId/apiKey/indexName.
+    for m in re.finditer("algolia", html, re.IGNORECASE):
+        start = max(0, m.start() - 200)
+        end = min(len(html), m.end() + 600)
+        print("  --- context around 'algolia' ---")
+        print("  " + html[start:end].replace("\n", " "))
+    for key in ["appId", "apiKey", "indexName", "app_id", "api_key", "index_name", "ALGOLIA"]:
+        hits = re.findall(rf'{key}["\']?\s*[:=]\s*["\']([^"\']{{1,60}})["\']', html)
+        if hits:
+            print(f"  {key} candidates: {hits[:5]}")
 
 
 def main():

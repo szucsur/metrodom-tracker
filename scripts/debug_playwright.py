@@ -1,29 +1,14 @@
 #!/usr/bin/env python3
-"""One-off diagnostic: the #location field on alberlet.hu is readonly, so
-clicking it must open a picker overlay with its own input. Find that
-input, then complete the search flow. Diagnostic only, not part of the
-regular tracker run."""
+"""One-off diagnostic: complete the alberlet.hu search — click #location,
+select 'IX. kerület' from the picker, set min-size/min-room, then find
+and click the actual submit button, and report the resulting URL + page
+content. Diagnostic only, not part of the regular tracker run."""
 
 import re
 
 from playwright.sync_api import sync_playwright
 
 HOME_URL = "https://www.alberlet.hu/"
-
-
-def dump_visible_inputs(page, label):
-    inputs = page.eval_on_selector_all(
-        "input, [contenteditable='true']",
-        """els => els.filter(e => e.offsetParent !== null).map(e => ({
-            tag: e.tagName, type: e.getAttribute('type'), id: e.id,
-            name: e.getAttribute('name'), placeholder: e.getAttribute('placeholder'),
-            readonly: e.hasAttribute('readonly'), cls: e.className
-        }))"""
-    )
-    print(f"=== visible inputs after {label} ({len(inputs)}) ===")
-    for i in inputs[:30]:
-        print(f"  {i}")
-    return inputs
 
 
 def main():
@@ -45,49 +30,60 @@ def main():
             except Exception:
                 pass
 
-        dump_visible_inputs(page, "page load")
-
         page.locator("#location").click(force=True)
-        page.wait_for_timeout(1000)
-        after_click = dump_visible_inputs(page, "clicking #location")
+        page.wait_for_timeout(800)
+        page.get_by_text("IX. kerület", exact=True).first.click(timeout=3000)
+        page.wait_for_timeout(500)
 
-        # Try any newly-visible, non-readonly text input as the real search box.
-        real_input = None
-        for i in after_click:
-            if i.get("tag") == "INPUT" and i.get("type") in (None, "text", "search") and not i.get("readonly"):
-                real_input = i
-                break
-        print(f"chosen real search input: {real_input}")
+        try:
+            page.fill("#min-size", "40", timeout=3000)
+        except Exception as e:
+            print(f"min-size fill failed: {e}")
+        try:
+            page.fill("#min-room", "2", timeout=3000)
+        except Exception as e:
+            print(f"min-room fill failed: {e}")
 
-        if real_input:
-            sel = f"#{real_input['id']}" if real_input.get("id") else None
-            if sel:
-                try:
-                    page.fill(sel, "Budapest IX. ker", timeout=5000)
-                    page.wait_for_timeout(1500)
-                except Exception as e:
-                    print(f"fill failed on {sel}: {e}")
-
-        # Whatever suggestion list appears now.
-        suggestions = page.eval_on_selector_all(
-            "li, .dropdown-item, [class*='suggest'], [class*='autocomplete'], [role='option']",
-            "els => els.filter(e => e.offsetParent !== null).map(e => e.textContent.trim()).filter(t => t.length)"
+        # Dump all visible clickable buttons/links now, to find the real submit control.
+        clickable = page.eval_on_selector_all(
+            "button, a, input[type=submit], [role=button]",
+            """els => els.filter(e => e.offsetParent !== null).map(e => ({
+                tag: e.tagName, text: (e.textContent||'').trim().slice(0,40),
+                cls: e.className, href: e.getAttribute('href')
+            })).filter(e => e.text.length > 0)"""
         )
-        print(f"visible suggestion-like texts ({len(suggestions)}): {suggestions[:20]}")
+        print(f"visible clickable elements ({len(clickable)}):")
+        for c in clickable[:40]:
+            print(f"  {c}")
 
-        for t in suggestions:
-            if "IX" in t or "Ferencváros" in t or "Ferencvaros" in t:
-                try:
-                    page.get_by_text(t, exact=True).first.click(timeout=2000)
-                    print(f"clicked suggestion: {t!r}")
+        search_click_texts = ["Keresés", "Keresek", "Mutasd", "Találatok", "Ingatlanok"]
+        clicked = False
+        for t in search_click_texts:
+            try:
+                el = page.get_by_text(t, exact=False).first
+                if el.is_visible(timeout=500):
+                    el.click(timeout=2000)
+                    print(f"clicked control with text containing {t!r}")
+                    clicked = True
                     break
-                except Exception as e:
-                    print(f"click failed for {t!r}: {e}")
+            except Exception:
+                continue
+        print(f"submit clicked: {clicked}")
 
-        page.wait_for_timeout(1000)
-        dump_visible_inputs(page, "selecting a suggestion")
+        page.wait_for_timeout(3000)
+        print(f"=== URL after submit attempt: {page.url}")
 
-        print(f"=== current URL: {page.url}")
+        visible_text = page.inner_text("body")
+        visible_text = re.sub(r"\s+", " ", visible_text).strip()
+        ft_count = len(re.findall(r"Ft", visible_text))
+        print(f"visible text length: {len(visible_text)}; 'Ft' occurrences: {ft_count}")
+        print(f"visible text sample: {visible_text[:2000]}")
+
+        hrefs = page.eval_on_selector_all("a[href]", "els => els.map(e => e.getAttribute('href'))")
+        listing_hrefs = [h for h in hrefs if h and re.search(r"/\d{4,}", h)]
+        print(f"total <a href>: {len(hrefs)}; numeric-id-looking: {len(listing_hrefs)}")
+        print(f"sample: {listing_hrefs[:15]}")
+
         browser.close()
 
 

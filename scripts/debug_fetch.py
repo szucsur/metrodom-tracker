@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-"""One-off diagnostic: inspect albifigyelo.hu's Budapest listing page
-(for filter options / query params) and a single listing detail page
-(for full address/price/size/room/description fields). Not part of the
-regular tracker run."""
+"""One-off diagnostic: look for an underlying API/AJAX endpoint behind
+albifigyelo.hu's filter UI (price/rooms/area inputs have no `name`
+attrs, suggesting JS-driven filtering), and count how many listing
+cards are actually present in the raw HTML vs. loaded dynamically.
+Not part of the regular tracker run."""
 
 import re
 
 import requests
-from bs4 import BeautifulSoup
 
 HEADERS = {
     "User-Agent": (
@@ -19,56 +19,36 @@ HEADERS = {
 }
 
 
-def dump_page(session, url, label):
-    print("=" * 70)
-    print(f"{label}: {url}")
-    try:
-        resp = session.get(url, headers=HEADERS, timeout=20)
-    except requests.RequestException as exc:
-        print(f"  request failed: {exc}")
-        return None
-    print(f"  status: {resp.status_code}; length: {len(resp.text)}")
-    return resp.text
-
-
 def main():
-    session = requests.Session()
+    resp = requests.get("https://albifigyelo.hu/kiado-alberletek/budapest", headers=HEADERS, timeout=20)
+    html = resp.text
+    print(f"status: {resp.status_code}; length: {len(html)}")
 
-    html = dump_page(session, "https://albifigyelo.hu/kiado-alberletek/budapest", "Budapest listing page")
-    if html:
-        soup = BeautifulSoup(html, "html.parser")
-        print("=== forms ===")
-        for f in soup.find_all("form"):
-            print(f"  form action={f.get('action')!r} method={f.get('method')!r}")
-        print("=== inputs/selects ===")
-        for el in soup.find_all(["input", "select"]):
-            print(f"  {el.name} type={el.get('type')!r} name={el.get('name')!r} id={el.get('id')!r} "
-                  f"placeholder={el.get('placeholder')!r}")
-        body = soup.find("body")
-        if body:
-            text = re.sub(r"\s+", " ", body.get_text(" ", strip=True))
-            print(f"body text length: {len(text)}")
-            print(f"body text sample (2500 chars): {text[:2500]}")
-        hirdetes_hrefs = sorted(set(
-            a["href"] for a in soup.find_all("a", href=True) if "/hirdetesek/" in a["href"]
-        ))
-        print(f"unique listing detail hrefs on this page: {len(hirdetes_hrefs)}")
-        print(f"sample: {hirdetes_hrefs[:5]}")
+    # Count actual listing detail hrefs present in raw HTML.
+    hrefs = set(re.findall(r'href="(https://albifigyelo\.hu/hirdetesek/\d+)"', html))
+    print(f"unique listing hrefs in raw HTML: {len(hrefs)}")
 
-        # Try a district-filtered variant to see if query params narrow results.
-        for suffix in ["?kerulet=9", "?district=9", "/ix-kerulet", "?ker=IX"]:
-            test_url = "https://albifigyelo.hu/kiado-alberletek/budapest" + suffix
-            resp = session.get(test_url, headers=HEADERS, timeout=20)
-            print(f"  district-filter attempt {suffix!r}: status={resp.status_code} length={len(resp.text)}")
+    # Look for API/AJAX/JSON config markers.
+    for marker in ["api.albifigyelo", "/api/", "fetch(", "axios", "window.__", "data-api",
+                   "application/json", "graphql", "algolia", "meilisearch", "typesense"]:
+        count = html.lower().count(marker.lower())
+        if count:
+            print(f"marker {marker!r}: {count} occurrence(s)")
 
-    detail_html = dump_page(session, "https://albifigyelo.hu/hirdetesek/58206719", "Sample detail page")
-    if detail_html:
-        soup2 = BeautifulSoup(detail_html, "html.parser")
-        body2 = soup2.find("body")
-        if body2:
-            text2 = re.sub(r"\s+", " ", body2.get_text(" ", strip=True))
-            print(f"detail body text length: {len(text2)}")
-            print(f"detail body text sample (2500 chars): {text2[:2500]}")
+    # Dump inline script blocks that look like config (contain 'kerulet' or 'district' or 'filter').
+    scripts = re.findall(r"<script(?![^>]*\bsrc=)[^>]*>(.*?)</script>", html, re.IGNORECASE | re.DOTALL)
+    print(f"inline script blocks: {len(scripts)}")
+    for s in scripts:
+        if re.search(r"kerulet|district|filter|api", s, re.IGNORECASE) and len(s.strip()) > 100:
+            print("--- relevant inline script snippet (first 800 chars) ---")
+            print(s.strip()[:800])
+
+    # Dump external script src attributes (helps spot the framework/bundle).
+    srcs = re.findall(r'<script[^>]+src="([^"]+)"', html, re.IGNORECASE)
+    print(f"script src count: {len(srcs)}")
+    for s in srcs:
+        if "albifigyelo" in s or s.startswith("/"):
+            print(f"  {s}")
 
 
 if __name__ == "__main__":

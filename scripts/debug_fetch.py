@@ -16,15 +16,30 @@ HEADERS = {
 }
 
 CANDIDATES = [
-    "https://ingatlan.com/lista/kiado+lakas+budapest-ix-ker",
-    "https://ingatlan.com/szukites/kiado+lakas+budapest-ix-ker",
-    "https://ingatlan.com/",
-    "https://www.alberlet.hu/",
-    "https://www.alberlet.hu/kiado-lakas",
-    "https://www.alberlet.hu/kiado-lakas/budapest",
     "https://www.alberlet.hu/kiado-lakas/budapest-ix-kerulet",
-    "https://alberlet.hu/kiado-lakas/budapest-ix-kerulet",
 ]
+
+
+def inspect_alberlet_cards(html: str):
+    import re
+
+    print(f"  total length: {len(html)}")
+    # Find occurrences of Hungarian rent price pattern "... Ft/hó" for context.
+    for m in list(re.finditer(r"Ft\s*/\s*h[oó]", html, re.IGNORECASE))[:3]:
+        start = max(0, m.start() - 400)
+        end = min(len(html), m.end() + 100)
+        print("  --- context around a price match ---")
+        print("  " + html[start:end].replace("\n", " "))
+    price_count = len(re.findall(r"Ft\s*/\s*h[oó]", html, re.IGNORECASE))
+    print(f"  total 'Ft/hó' occurrences: {price_count}")
+
+    # Class names that appear right before a price match, as selector candidates.
+    class_hits = re.findall(r'class="([^"]{0,60})"[^<]{0,300}?Ft\s*/\s*h[oó]', html, re.IGNORECASE)
+    print(f"  candidate class attrs near price: {class_hits[:10]}")
+
+    # Any listing-detail-looking links.
+    hrefs = re.findall(r'href="([^"]*(?:hirdetes|kiado-lakas)[^"]*)"', html, re.IGNORECASE)
+    print(f"  sample hrefs matching listing pattern (first 10 of {len(hrefs)}): {hrefs[:10]}")
 
 
 def main():
@@ -39,13 +54,7 @@ def main():
             continue
         print(f"  final url: {resp.url}")
         print(f"  status: {resp.status_code}")
-        server = resp.headers.get("server", "")
-        cf_ray = resp.headers.get("cf-ray", "")
-        print(f"  server header: {server!r}  cf-ray: {cf_ray!r}")
-        snippet = resp.text[:600].replace("\n", " ")
-        print(f"  body snippet: {snippet}")
-        has_next_data = "__NEXT_DATA__" in resp.text
-        print(f"  has __NEXT_DATA__: {has_next_data}")
+        inspect_alberlet_cards(resp.text)
 
 
 if __name__ == "__main__":

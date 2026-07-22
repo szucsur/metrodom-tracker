@@ -17,6 +17,15 @@ class Listing:
     description_text: str = ""
     posted_at: Optional[str] = None  # ISO string if known
 
+    # "exact" (default): address_text is expected to name the actual
+    # street, so ADDRESS_KEYWORDS must match for location_matches().
+    # "district": this source only ever exposes district/neighborhood
+    # level location (no street name available anywhere, even in
+    # structured data) — location_matches() accepts a LOCATION_HINTS-only
+    # match instead, and filters.py flags these listings as needing
+    # manual street confirmation.
+    location_precision: str = "exact"
+
     # Filled in by filters.py — None means "could not be determined from
     # the listing text", not "fails the filter".
     furnished_status: Optional[str] = None   # "full" | "partial" | None

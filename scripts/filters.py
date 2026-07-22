@@ -23,7 +23,15 @@ def text_matches_any(text: str, keywords) -> bool:
 
 def location_matches(listing: Listing) -> bool:
     haystack = f"{listing.title} {listing.address_text} {listing.description_text}"
-    return text_matches_any(haystack, config.ADDRESS_KEYWORDS) or (
+    if text_matches_any(haystack, config.ADDRESS_KEYWORDS):
+        return True
+    if listing.location_precision == "district":
+        # This source never exposes a street name, even in structured
+        # data — accept a district-level match, but flag it (see
+        # passes_soft_filters) since it isn't confirmed to be the exact
+        # street/building.
+        return text_matches_any(haystack, config.LOCATION_HINTS)
+    return (
         text_matches_any(haystack, config.LOCATION_HINTS)
         and text_matches_any(haystack, ["vágóhíd", "vagohid", "metrodom"])
     )
@@ -86,6 +94,11 @@ def passes_hard_filters(listing: Listing) -> bool:
 
 def passes_soft_filters(listing: Listing) -> bool:
     """Only excludes when a soft criterion is explicitly contradicted."""
+    if listing.location_precision == "district":
+        listing.notes.append(
+            "district-level match only (no street name available from this "
+            "source) — click through to confirm this is actually the right street"
+        )
     if listing.furnished_status is None:
         listing.notes.append("furnished status not stated — verify manually")
     if listing.has_outdoor_space is None:

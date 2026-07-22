@@ -1,10 +1,14 @@
 """Temporary diagnostic script for GitHub Actions — not part of the tracker.
 
-Round 2 for megveszlak.hu: the homepage exposed a direct nav link
-/alberlet-budapest (a rental listing page for Budapest specifically, plus
-per-city variants like /alberlet-pecs). This inspects that page's markup —
-listing card structure, price/size/room text, any district/street filter
-params, JSON-LD, and pagination — to figure out how to parse it.
+Round 4 (oc.hu): the Playwright capture showed the search form actually
+navigates to a plain GET URL using semicolon/tilde path segments:
+https://www.oc.hu/ingatlanok/lista/ertekesites:kiado;meret:40~;szoba:2~
+(min-only ranges use a trailing ~). Confirm this is a real, filterable,
+plain-requests-fetchable URL and inspect its listing card markup.
+
+Round 3 (megveszlak.hu): dig into the exact card markup around
+hirdetes_item_ar/cim/meretekdiv classes found on /alberlet-budapest, and
+check whether pagination (?Oldal=2) and a per-district URL work.
 """
 
 import re
@@ -20,75 +24,74 @@ HEADERS = {
     "Accept-Language": "hu-HU,hu;q=0.9,en;q=0.8",
 }
 
-LIST_URL = "https://megveszlak.hu/alberlet-budapest"
+
+def get(url):
+    return requests.get(url, headers=HEADERS, timeout=20)
 
 
-def dump():
+def dump_oc():
+    url = "https://www.oc.hu/ingatlanok/lista/ertekesites:kiado;meret:40~;szoba:2~"
     print("=" * 80)
-    print(f"GET {LIST_URL}")
-    resp = requests.get(LIST_URL, headers=HEADERS, timeout=20)
-    print(f"status={resp.status_code} final_url={resp.url}")
+    print(f"GET {url}")
+    resp = get(url)
     html = resp.text
+    print(f"status={resp.status_code} final_url={resp.url}")
     print(f"content length: {len(html)}")
-
     title_match = re.search(r"<title>(.*?)</title>", html, re.IGNORECASE | re.DOTALL)
     print(f"title: {title_match.group(1).strip() if title_match else 'NONE'}")
 
-    ldjson_blocks = re.findall(r'<script type="application/ld\+json">(.*?)</script>', html, re.DOTALL)
-    print(f"JSON-LD script blocks found: {len(ldjson_blocks)}")
-    for i, block in enumerate(ldjson_blocks):
-        types = re.findall(r'"@type"\s*:\s*"([^"]+)"', block)
-        print(f"  block[{i}] @type values: {types[:5]} (len={len(block)})")
-        if "RealEstate" in block or "ItemList" in block:
-            print(f"    first 800 chars: {block.strip()[:800]}")
+    total_count = re.findall(r'(\d[\d\s]{0,8})\s*(?:db|találat)', html, re.IGNORECASE)
+    print(f"possible result-count numbers: {total_count[:10]}")
 
-    print(f"'Ft/hó' occurrences: {html.count('Ft/hó')}")
-    print(f"'Ft /hó' occurrences: {html.count('Ft /hó')}")
-    print(f"'m²' occurrences: {html.count('m²')}")
-    print(f"'szoba' occurrences: {html.lower().count('szoba')}")
-    print(f"'vágóhíd' (case-insens) occurrences: {html.lower().count('vágóhíd')}")
-    print(f"'metrodom' (case-insens) occurrences: {html.lower().count('metrodom')}")
-    print(f"'ix. ker' (case-insens) occurrences: {html.lower().count('ix. ker')}")
-    print(f"'ferencváros' (case-insens) occurrences: {html.lower().count('ferencváros')}")
-
-    # listing detail links: guess pattern from hrefs with digits
     hrefs = re.findall(r'href="([^"]+)"', html)
-    print(f"total hrefs: {len(hrefs)}")
-    digit_hrefs = [h for h in hrefs if re.search(r"\d{3,}", h)]
-    seen = set()
-    count = 0
-    print("digit-bearing hrefs (sample up to 20):")
-    for h in digit_hrefs:
-        if h in seen:
-            continue
-        seen.add(h)
+    listing_hrefs = sorted(set(h for h in hrefs if re.search(r"/ingatlanok/H\d+", h)))
+    print(f"unique /ingatlanok/H* hrefs found: {len(listing_hrefs)}")
+    for h in listing_hrefs[:15]:
         print(f"  {h}")
-        count += 1
-        if count >= 20:
-            break
 
-    # pagination / district filter clues
-    kerulet_hrefs = [h for h in hrefs if "kerulet" in h.lower() or "ker" in h.lower()]
-    print(f"hrefs mentioning kerulet (sample up to 10): {kerulet_hrefs[:10]}")
-    page_hrefs = [h for h in hrefs if "oldal" in h.lower() or "page" in h.lower()]
-    print(f"pagination-like hrefs (sample up to 10): {page_hrefs[:10]}")
+    # dump full card block around the first listing anchor, further than before,
+    # to find where price/address/room-count text sits within the card.
+    m = re.search(r'href="(/ingatlanok/H\d+)"', html)
+    if m:
+        start = max(0, m.start() - 100)
+        end = min(len(html), m.end() + 3000)
+        print("--- full card HTML window ---")
+        print(html[start:end])
 
-    # dump context around first szoba occurrence (likely inside a listing card)
-    idx = html.lower().find("szoba")
-    if idx != -1:
-        print("--- context around first 'szoba' ---")
-        print(html[max(0, idx - 400):idx + 400])
 
-    # dump context around first m² occurrence
-    idx2 = html.find("m²")
-    if idx2 != -1:
-        print("--- context around first 'm²' ---")
-        print(html[max(0, idx2 - 400):idx2 + 200])
+def dump_megveszlak():
+    print("=" * 80)
+    url = "https://megveszlak.hu/alberlet-budapest"
+    print(f"GET {url}")
+    resp = get(url)
+    html = resp.text
+    print(f"status={resp.status_code}")
 
-    # look for a repeating card container class
-    class_matches = re.findall(r'class="([^"]*(?:card|item|listing|result)[^"]*)"', html, re.IGNORECASE)
-    print(f"classes containing card/item/listing/result (sample up to 15): {class_matches[:15]}")
+    m = re.search(r'class="hirdetes_item_ar"', html)
+    if m:
+        start = max(0, m.start() - 800)
+        end = min(len(html), m.end() + 1500)
+        print("--- full card HTML window around first hirdetes_item_ar ---")
+        print(html[start:end])
+
+    print("=" * 80)
+    url2 = "https://megveszlak.hu/alberlet-budapest?Oldal=2"
+    print(f"GET {url2}")
+    resp2 = get(url2)
+    print(f"status={resp2.status_code}")
+    hrefs2 = re.findall(r'href="(/hirdetes/[^"]+)"', resp2.text)
+    print(f"page 2 listing hrefs found: {len(set(hrefs2))} (sample 5): {sorted(set(hrefs2))[:5]}")
+
+    print("=" * 80)
+    url3 = "https://megveszlak.hu/alberlet-budapest-ix-kerulet"
+    print(f"GET {url3}")
+    resp3 = get(url3)
+    print(f"status={resp3.status_code} final_url={resp3.url}")
+    if resp3.status_code == 200:
+        title_match = re.search(r"<title>(.*?)</title>", resp3.text, re.IGNORECASE | re.DOTALL)
+        print(f"title: {title_match.group(1).strip() if title_match else 'NONE'}")
 
 
 if __name__ == "__main__":
-    dump()
+    dump_oc()
+    dump_megveszlak()

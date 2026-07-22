@@ -14,7 +14,8 @@ utca, Budapest 1097, but the filters in `scripts/config.py` are just data
    `oc.hu` (Otthon Centrum), `megveszlak.hu`, and `tappancsosotthon.hu`
    ("Rent with Paws", a pet-friendly rental agency).
 2. **Filters** for:
-   - Address/building keyword match (default: Vágóhíd utca / Metrodom Green)
+   - Address/building keyword match (default: Vágóhíd utca / Metrodom
+     Green / Cordia Woodland)
      — two sources (albifigyelo.hu, megveszlak.hu) only match at district
      level; see below
    - Minimum size and room count (default: 40 sqm, 2 rooms)

@@ -11,13 +11,16 @@ ADDRESS_KEYWORDS = [
     "vágóhíd",
     "vagohid",
     "metrodom green",
+    "cordia woodland",
 ]
-# Deliberately NOT including bare "metrodom" here: several other buildings
-# share the brand (Metrodom River/Park/Panoráma/City Home/etc. across
-# different districts), and a loose "metrodom" match would short-circuit
-# location_matches() into treating any of them as this building — this bit
-# us for real once a source (tappancsosotthon.hu) listed multiple Metrodom
-# buildings at once. "metrodom green" (the specific complex) is enough.
+# Deliberately NOT including bare "metrodom" or bare "cordia" here: several
+# other buildings share each brand (Metrodom River/Park/Panoráma/City
+# Home/etc.; Cordia develops many unrelated projects across Budapest), and
+# a loose brand-only match would short-circuit location_matches() into
+# treating any of them as a target building — this bit us for real once a
+# source (tappancsosotthon.hu) listed multiple Metrodom buildings at once.
+# The specific complex name ("metrodom green", "cordia woodland") is
+# enough, and is what location_matches() actually needs.
 
 # Budapest postal code / district hints used as a secondary signal when a
 # listing doesn't spell out the street name.

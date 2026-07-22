@@ -8,8 +8,9 @@ utca, Budapest 1097, but the filters in `scripts/config.py` are just data
 
 ## What this does
 
-1. **Fetches** current listings from `ingatlan.com`, `alberlet.hu`, and
-   `flatco.hu` (Metrodom's own property management site).
+1. **Fetches** current listings from `ingatlan.com`, `alberlet.hu`,
+   `flatco.hu` (Metrodom's own property management site), and
+   `rentingo.com`.
 2. **Filters** for:
    - Address/building keyword match (default: Vágóhíd utca / Metrodom Green)
    - Minimum size and room count (default: 40 sqm, 2 rooms)
@@ -31,6 +32,16 @@ each run in case that changes, but expect it to consistently return zero
 listings — getting past it would require the same kind of anti-bot
 evasion this project deliberately avoids for Facebook (see below).
 **Use ingatlan.com's own saved-search email alerts** for that source.
+
+## rentingo.com is also blocked by Cloudflare
+
+Confirmed the same way: rentingo.com returns HTTP 403 with a genuine
+Cloudflare "Attention Required!" challenge page, tested with both a
+minimal header set and a fuller browser-like one — same block either
+time. `scripts/scrapers/rentingo.py` still tries each run in case that
+changes, but expect zero listings from this source too, for the same
+anti-bot-evasion reasons as ingatlan.com and Facebook.
+**Use rentingo.com's own saved-search email alerts** for that source.
 
 ## flatco.hu: the landlord's own live availability list
 
@@ -111,8 +122,8 @@ Edit `scripts/config.py`:
 
 ## Notes on reliability
 
-- `ingatlan.com` is Cloudflare-blocked (see above) — 0 listings from this
-  source is expected, not a bug.
+- `ingatlan.com` and `rentingo.com` are both Cloudflare-blocked (see
+  above) — 0 listings from either source is expected, not a bug.
 - `alberlet.hu` is verified working: a plain HTTP GET to
   `https://www.alberlet.hu/kiado-alberlet?ingatlan-tipus=lakas&kerulet=ix&meret=40-x-m2&szoba=2-x&keres=normal&limit=24`
   returns full server-rendered listings, no browser needed. Each listing's

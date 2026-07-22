@@ -1,18 +1,15 @@
 """Temporary diagnostic script for GitHub Actions — not part of the tracker.
 
-Round 5 (oc.hu): the filtered URL
-https://www.oc.hu/ingatlanok/lista/ertekesites:kiado;meret:40~;szoba:2~
-works and returns 11 pre-filtered (>=40m2, >=2 room) listings, but the
-window captured after the card anchor was just an image carousel — the
-price/address/size text sits BEFORE the <a href="/ingatlanok/H...">, in the
-h4 block. This grabs a window before each anchor instead.
-
-Round (megveszlak.hu): check whether a listing DETAIL page exposes the
-actual street name (list page only ever showed district, e.g. "Budapest V.
-kerület, Belváros") — if so this source can be "exact" precision like
-alberlet.hu instead of "district" precision like albifigyelo.hu.
+Round 6 (oc.hu): the card HTML contains an HTML-entity-escaped JSON blob
+(looks like a Symfony UX Live Component props value — has base_reg_nr, url,
+slogen, @attributes, @checksum keys) that likely holds the FULL listing
+record (address, price, size, rooms) server-rendered right there on the
+list page — no per-listing detail-page fetch needed if so. This locates the
+attribute, unescapes it, and dumps its keys.
 """
 
+import html as html_module
+import json
 import re
 
 import requests
@@ -36,46 +33,24 @@ def dump_oc():
     print("=" * 80)
     print(f"GET {url}")
     resp = get(url)
-    html = resp.text
+    html_text = resp.text
     print(f"status={resp.status_code}")
 
-    for m in re.finditer(r'href="(/ingatlanok/H\d+)"', html):
-        start = max(0, m.start() - 2500)
+    # find every attribute value that contains base_reg_nr (the live-component props blob)
+    for m in re.finditer(r'([a-zA-Z0-9_-]+)="([^"]*base_reg_nr[^"]*)"', html_text):
+        attr_name, raw_value = m.group(1), m.group(2)
+        print(f"found attribute: {attr_name} (raw length {len(raw_value)})")
+        unescaped = html_module.unescape(raw_value)
+        # the value itself may be JSON with escaped unicode like é already literal after html unescape
+        try:
+            data = json.loads(unescaped)
+            print("Parsed as JSON! Top-level keys:", list(data.keys()) if isinstance(data, dict) else type(data))
+            print(json.dumps(data, ensure_ascii=False, indent=2)[:3000])
+        except json.JSONDecodeError as exc:
+            print(f"not directly parseable as JSON ({exc}); first 1500 chars of unescaped value:")
+            print(unescaped[:1500])
         print("-" * 60)
-        print(f"card for {m.group(1)}:")
-        print(html[start:m.start() + 40])
-        break  # just need one full example
-
-
-def dump_megveszlak():
-    print("=" * 80)
-    url = "https://megveszlak.hu/hirdetes/kiado-lakas-budapest-ix-kerulet-98544534"
-    print(f"GET {url}")
-    resp = get(url)
-    html = resp.text
-    print(f"status={resp.status_code} final_url={resp.url}")
-    print(f"content length: {len(html)}")
-
-    title_match = re.search(r"<title>(.*?)</title>", html, re.IGNORECASE | re.DOTALL)
-    print(f"title: {title_match.group(1).strip() if title_match else 'NONE'}")
-
-    # look for any street-name-bearing text/hidden fields
-    for keyword in ["cím", "Cím", "utca", "út ", "körút", "tér "]:
-        idx = html.find(keyword)
-        if idx != -1:
-            print(f"--- context around '{keyword}' ---")
-            print(html[max(0, idx - 200):idx + 300])
-
-    # check for JSON-LD / map coordinates
-    ldjson_blocks = re.findall(r'<script type="application/ld\+json">(.*?)</script>', html, re.DOTALL)
-    print(f"JSON-LD blocks: {len(ldjson_blocks)}")
-    for i, block in enumerate(ldjson_blocks):
-        print(f"  block[{i}] first 500 chars: {block.strip()[:500]}")
-
-    lat_lng = re.findall(r'(lat|lng|latitude|longitude)["\']?\s*[:=]\s*["\']?(-?\d+\.\d+)', html, re.IGNORECASE)
-    print(f"lat/lng-like matches: {lat_lng[:5]}")
 
 
 if __name__ == "__main__":
     dump_oc()
-    dump_megveszlak()

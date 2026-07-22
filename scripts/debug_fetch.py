@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
-"""One-off diagnostic: inspect albifigyelo.hu's real structure — what
-kind of site it actually is, homepage reachability, Cloudflare/bot
-protection, and search form fields, so a real scraper (or a decision not
-to build one) can be based on ground truth. Not part of the regular
-tracker run."""
+"""One-off diagnostic: inspect albifigyelo.hu's Budapest listing page
+(for filter options / query params) and a single listing detail page
+(for full address/price/size/room/description fields). Not part of the
+regular tracker run."""
 
 import re
 
@@ -19,65 +18,57 @@ HEADERS = {
     "Accept-Language": "hu-HU,hu;q=0.9,en;q=0.8",
 }
 
-CANDIDATES = [
-    "https://albifigyelo.hu/",
-    "https://www.albifigyelo.hu/",
-]
+
+def dump_page(session, url, label):
+    print("=" * 70)
+    print(f"{label}: {url}")
+    try:
+        resp = session.get(url, headers=HEADERS, timeout=20)
+    except requests.RequestException as exc:
+        print(f"  request failed: {exc}")
+        return None
+    print(f"  status: {resp.status_code}; length: {len(resp.text)}")
+    return resp.text
 
 
 def main():
     session = requests.Session()
-    html = None
-    for url in CANDIDATES:
-        print("=" * 70)
-        print(f"URL: {url}")
-        try:
-            resp = session.get(url, headers=HEADERS, timeout=20, allow_redirects=True)
-        except requests.RequestException as exc:
-            print(f"  request failed: {exc}")
-            continue
-        print(f"  final url: {resp.url}")
-        print(f"  status: {resp.status_code}")
-        server = resp.headers.get("server", "")
-        cf_ray = resp.headers.get("cf-ray", "")
-        print(f"  server header: {server!r}  cf-ray: {cf_ray!r}")
-        print(f"  length: {len(resp.text)}")
-        if resp.status_code == 200 and html is None:
-            html = resp.text
 
-    if not html:
-        print("No successful homepage fetch — stopping here.")
-        return
+    html = dump_page(session, "https://albifigyelo.hu/kiado-alberletek/budapest", "Budapest listing page")
+    if html:
+        soup = BeautifulSoup(html, "html.parser")
+        print("=== forms ===")
+        for f in soup.find_all("form"):
+            print(f"  form action={f.get('action')!r} method={f.get('method')!r}")
+        print("=== inputs/selects ===")
+        for el in soup.find_all(["input", "select"]):
+            print(f"  {el.name} type={el.get('type')!r} name={el.get('name')!r} id={el.get('id')!r} "
+                  f"placeholder={el.get('placeholder')!r}")
+        body = soup.find("body")
+        if body:
+            text = re.sub(r"\s+", " ", body.get_text(" ", strip=True))
+            print(f"body text length: {len(text)}")
+            print(f"body text sample (2500 chars): {text[:2500]}")
+        hirdetes_hrefs = sorted(set(
+            a["href"] for a in soup.find_all("a", href=True) if "/hirdetesek/" in a["href"]
+        ))
+        print(f"unique listing detail hrefs on this page: {len(hirdetes_hrefs)}")
+        print(f"sample: {hirdetes_hrefs[:5]}")
 
-    print("=" * 70)
-    print("Inspecting homepage content")
-    print(f"has __NEXT_DATA__: {'__NEXT_DATA__' in html}")
-    print(f"has algolia marker: {'algolia' in html.lower()}")
-    print(f"has <noscript>: {'<noscript' in html.lower()}")
+        # Try a district-filtered variant to see if query params narrow results.
+        for suffix in ["?kerulet=9", "?district=9", "/ix-kerulet", "?ker=IX"]:
+            test_url = "https://albifigyelo.hu/kiado-alberletek/budapest" + suffix
+            resp = session.get(test_url, headers=HEADERS, timeout=20)
+            print(f"  district-filter attempt {suffix!r}: status={resp.status_code} length={len(resp.text)}")
 
-    soup = BeautifulSoup(html, "html.parser")
-    body = soup.find("body")
-    if body:
-        text = re.sub(r"\s+", " ", body.get_text(" ", strip=True))
-        print(f"body text length: {len(text)}")
-        print(f"body text sample (2000 chars): {text[:2000]}")
-
-    print("=== forms ===")
-    for f in soup.find_all("form"):
-        print(f"  form action={f.get('action')!r} method={f.get('method')!r} id={f.get('id')!r} class={f.get('class')!r}")
-
-    print("=== inputs/selects ===")
-    for el in soup.find_all(["input", "select"]):
-        print(f"  {el.name} type={el.get('type')!r} name={el.get('name')!r} id={el.get('id')!r} "
-              f"placeholder={el.get('placeholder')!r} class={el.get('class')!r}")
-
-    print("=== nav/menu links possibly related to search/kiado/rent ===")
-    for a in soup.find_all("a", href=True):
-        href = a["href"]
-        text = a.get_text(strip=True)
-        if re.search(r"kiad|berlet|kereses|search|lakas|rent|apartment|figyel", href, re.IGNORECASE) or \
-           re.search(r"kiad|berlet|kereses|keres|rent|apartment|figyel", text, re.IGNORECASE):
-            print(f"  href={href!r} text={text[:60]!r}")
+    detail_html = dump_page(session, "https://albifigyelo.hu/hirdetesek/58206719", "Sample detail page")
+    if detail_html:
+        soup2 = BeautifulSoup(detail_html, "html.parser")
+        body2 = soup2.find("body")
+        if body2:
+            text2 = re.sub(r"\s+", " ", body2.get_text(" ", strip=True))
+            print(f"detail body text length: {len(text2)}")
+            print(f"detail body text sample (2500 chars): {text2[:2500]}")
 
 
 if __name__ == "__main__":

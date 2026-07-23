@@ -3,16 +3,23 @@
 flatco.hu is not a generic listing portal; it's run by Metrodom (the
 building's own management company), and its global nav exposes every
 currently-available rental unit directly as a link with text like
-"Metrodom Green - A.B.304" -> /rental/metrodom-green-a-b-304/. That nav
-is present on every page (confirmed on the homepage), so this is
-effectively the landlord's own live "available now" list — simpler and
-more authoritative than any generic search, and no filtering by
-district/price/etc. is needed since the link list already only contains
-genuinely available units.
+"Metrodom Green - A.B.304" -> /rental/metrodom-green-a-b-304/, or
+"City Home - G.409" -> /rental/city-home-g-409/. That nav is present on
+every page (confirmed on the homepage), so this is effectively the
+landlord's own live "available now" list — simpler and more authoritative
+than any generic search, and no filtering by district/price/etc. is
+needed since the link list already only contains genuinely available
+units.
 
 This scraper fetches the homepage, finds nav links whose "Building -
-Unit" text matches config.ADDRESS_KEYWORDS, and follows each into its
-detail page to pull price/size/rooms/furnished/terrace/description.
+Unit" text matches one of config.FLATCO_BUILDING_NAMES, and follows each
+into its detail page to pull price/size/rooms/furnished/terrace/
+description. The title/address are built directly from the nav link's
+own building name (mapped to its full canonical form below) rather than
+re-parsed from the detail page's free text — flatco.hu's own nav already
+identifies the building unambiguously, and City Home's detail pages just
+say "City Home" with no "Metrodom" prefix, so this is also what makes
+that building's listings match config.ADDRESS_KEYWORDS at all.
 """
 
 import re
@@ -36,6 +43,11 @@ HEADERS = {
 
 _UNIT_LINK_RE = re.compile(r"^(.+?)\s+-\s+([\w.]+)$")
 
+_CANONICAL_BUILDING_NAMES = {
+    "metrodom green": "Metrodom Green",
+    "city home": "Metrodom City Home",
+}
+
 
 def fetch(session: requests.Session = None) -> List[Listing]:
     session = session or requests.Session()
@@ -51,7 +63,7 @@ def fetch(session: requests.Session = None) -> List[Listing]:
 
     listings = []
     for building, unit_code, href in unit_links:
-        detail = _fetch_detail(session, href)
+        detail = _fetch_detail(session, href, building, unit_code)
         if detail:
             listings.append(detail)
     return listings
@@ -59,8 +71,8 @@ def fetch(session: requests.Session = None) -> List[Listing]:
 
 def _find_matching_unit_links(soup: BeautifulSoup):
     """Nav links like 'Metrodom Green - A.B.304' whose building name
-    matches config.FLATCO_BUILDING_NAME exactly (not the looser, more
-    generic config.ADDRESS_KEYWORDS — flatco.hu manages several other
+    matches one of config.FLATCO_BUILDING_NAMES exactly (not the looser,
+    more generic config.ADDRESS_KEYWORDS — flatco.hu manages several other
     Metrodom buildings, and "metrodom" alone would match those too)."""
     matches = []
     seen_hrefs = set()
@@ -72,13 +84,13 @@ def _find_matching_unit_links(soup: BeautifulSoup):
         building, unit_code = m.groups()
         if a["href"] in seen_hrefs:
             continue
-        if building.lower() == config.FLATCO_BUILDING_NAME:
+        if building.lower() in config.FLATCO_BUILDING_NAMES:
             seen_hrefs.add(a["href"])
             matches.append((building, unit_code, a["href"]))
     return matches
 
 
-def _fetch_detail(session: requests.Session, url: str) -> Listing:
+def _fetch_detail(session: requests.Session, url: str, building: str, unit_code: str) -> Listing:
     try:
         resp = session.get(url, headers=HEADERS, timeout=20)
         resp.raise_for_status()
@@ -100,8 +112,8 @@ def _fetch_detail(session: requests.Session, url: str) -> Listing:
     rooms = float(rooms_match.group(1)) if rooms_match else None
 
     listing_id = url.rstrip("/").rsplit("/", 1)[-1]
-    title_match = re.search(r"(Metrodom [\w.]+ - [\w.]+)", text)
-    title = title_match.group(1) if title_match else listing_id
+    canonical_building = _CANONICAL_BUILDING_NAMES.get(building.lower(), building)
+    title = f"{canonical_building} - {unit_code}"
 
     return Listing(
         source="flatco.hu",
@@ -112,5 +124,5 @@ def _fetch_detail(session: requests.Session, url: str) -> Listing:
         size_sqm=size_sqm,
         rooms=rooms,
         address_text=title,
-        description_text=text,
+        description_text=f"{title} {text}",
     )

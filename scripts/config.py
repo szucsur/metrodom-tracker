@@ -83,11 +83,15 @@ MAX_RENT_HUF = 300_000
 ALBERLET_DISTRICT_CODE = "ix"
 
 # flatco.hu is Metrodom's own management site and lists several
-# buildings (Metrodom River, Green, Park, Panoráma...) — this must be
-# the exact building name so flatco.py doesn't also pick up other
-# Metrodom buildings' units (bare "metrodom" in ADDRESS_KEYWORDS is too
-# loose for that comparison).
-FLATCO_BUILDING_NAME = "metrodom green"
+# buildings (Metrodom River, Green, Park, Panoráma, City Home...) —
+# flatco.py only fetches units for the exact nav building names listed
+# here (bare "metrodom" in ADDRESS_KEYWORDS is too loose for that
+# comparison). "City Home" is flatco.hu's nav name for the Metrodom City
+# Home building — confirmed to be the same Nádasdy utca complex tracked
+# here (see ADDRESS_KEYWORDS) — but flatco.hu's own listings just say
+# "City Home", no "Metrodom" prefix, so flatco.py tags its output with
+# the full canonical name to match ADDRESS_KEYWORDS.
+FLATCO_BUILDING_NAMES = ["metrodom green", "city home"]
 
 # Keywords (case-insensitive, Hungarian) used to detect furnishing status.
 FURNISHED_KEYWORDS = ["bútorozott", "butorozott", "berendezett", "felszerelt"]

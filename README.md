@@ -59,14 +59,19 @@ anti-bot-evasion reasons as ingatlan.com and Facebook.
 flatco.hu is Metrodom's own property management site (not a generic
 listing portal). Its site-wide nav exposes every currently-available
 rental unit directly as a link, e.g. "Metrodom Green - A.B.304" →
-`/rental/metrodom-green-a-b-304/`. `scripts/scrapers/flatco.py` fetches
-the homepage, picks out nav links whose building name exactly matches
-`config.FLATCO_BUILDING_NAME` ("metrodom green" — kept separate from the
-looser `ADDRESS_KEYWORDS` since flatco.hu also manages other Metrodom
-buildings like Metrodom River/Park/Panoráma, and bare "metrodom" would
-match those too), then follows each into its detail page for
-price/size/rooms/furnished/terrace. This is effectively the landlord's
-own "available now" list, so no district/price filtering is needed —
+`/rental/metrodom-green-a-b-304/`, or "City Home - G.409" →
+`/rental/city-home-g-409/`. `scripts/scrapers/flatco.py` fetches the
+homepage, picks out nav links whose building name exactly matches one of
+`config.FLATCO_BUILDING_NAMES` (`["metrodom green", "city home"]` — kept
+separate from the looser `ADDRESS_KEYWORDS` since flatco.hu also manages
+other Metrodom buildings like Metrodom River/Park/Panoráma, and bare
+"metrodom" would match those too), then follows each into its detail page
+for price/size/rooms/furnished/terrace. City Home's own flatco.hu pages
+just say "City Home" with no "Metrodom" prefix, so `flatco.py` builds the
+listing's title/address from a canonical name ("Metrodom City Home")
+rather than the page's own text, so it still matches `ADDRESS_KEYWORDS`.
+This is effectively the landlord's own "available now" list, so no
+district/price filtering is needed —
 every link found is a genuinely open unit.
 
 ## albifigyelo.hu: district-level watch, not street-level
@@ -349,7 +354,7 @@ Edit `scripts/config.py`:
 - `MIN_SIZE_SQM`, `MIN_ROOMS` — hard size/room filters
 - `MAX_RENT_HUF` — hard maximum monthly rent, in HUF
 - `ALBERLET_DISTRICT_CODE` — district code for alberlet.hu's search URL
-- `FLATCO_BUILDING_NAME` — exact building name flatco.py watches for
+- `FLATCO_BUILDING_NAMES` — exact building name(s) flatco.py watches for
   (only relevant if you're tracking a Metrodom-managed building)
 - `FURNISHED_KEYWORDS`, `OUTDOOR_SPACE_KEYWORDS` — soft-filter keywords
 - `EARLIEST_MOVE_IN_YEAR` / `EARLIEST_MOVE_IN_MONTH` — move-in cutoff

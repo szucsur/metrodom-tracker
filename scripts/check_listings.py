@@ -103,6 +103,8 @@ def main():
     all_listings = gather_all_listings()
     matches = filters.apply_all(all_listings)
     print(f"{len(matches)} listing(s) pass the Metrodom Green filters")
+    for m in matches:
+        print(f"  match: [{m.source}] {m.title} -> {m.url}")
 
     if args.send_all_matches:
         if not matches:

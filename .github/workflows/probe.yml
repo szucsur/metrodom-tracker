@@ -24,6 +24,7 @@ jobs:
       - name: Fetch and inspect
         run: |
           python3 - <<'PYEOF'
+          import re
           import requests
 
           url = "${{ inputs.url }}"
@@ -32,12 +33,32 @@ jobs:
                   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
                   "(KHTML, like Gecko) Chrome/124.0 Safari/537.36"
               ),
-              "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+              "Accept": "*/*",
               "Accept-Language": "hu-HU,hu;q=0.9,en;q=0.8",
           }
-          resp = requests.get(url, headers=headers, timeout=20)
+          resp = requests.get(url, headers=headers, timeout=30)
           print("STATUS:", resp.status_code)
           print("LENGTH:", len(resp.text))
-          print("=== FIRST 6000 CHARS ===")
-          print(resp.text[:6000])
+
+          if url.endswith(".js"):
+              text = resp.text
+              # Look for likely API base URLs / endpoint path fragments.
+              patterns = [
+                  r"https?://[a-zA-Z0-9.\-]*(api|graphql|search)[a-zA-Z0-9.\-]*\.zenga\.hu[^\"'` ]*",
+                  r"https?://api\.[a-zA-Z0-9.\-]+/[^\"'` ]*",
+                  r"[\"'`](/api/[^\"'` ]+)[\"'`]",
+                  r"graphassets\.com[^\"'` ]*",
+                  r"environment\s*[:=]\s*\{[^}]{0,400}",
+              ]
+              seen = set()
+              for pat in patterns:
+                  for m in re.finditer(pat, text):
+                      s = m.group(0)
+                      if s not in seen:
+                          seen.add(s)
+                          print("MATCH:", s[:300])
+              print(f"total unique matches: {len(seen)}")
+          else:
+              print("=== FIRST 6000 CHARS ===")
+              print(resp.text[:6000])
           PYEOF

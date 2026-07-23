@@ -10,6 +10,10 @@ on:
         description: "Send one synthetic test listing instead of a real run (verifies SMTP delivery/template only)"
         type: boolean
         default: false
+      send_all_matches:
+        description: "Scrape for real and email every currently matching listing, ignoring dedup state (does not mark them as seen)"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -41,7 +45,7 @@ jobs:
           GMAIL_ADDRESS: ${{ secrets.GMAIL_ADDRESS }}
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
           PYTHONPATH: scripts
-        run: python scripts/check_listings.py ${{ inputs.test_email && '--test-email' || '' }}
+        run: python scripts/check_listings.py ${{ inputs.test_email && '--test-email' || '' }} ${{ inputs.send_all_matches && '--send-all-matches' || '' }}
 
       - name: Commit updated dedup state
         run: |

@@ -2,9 +2,10 @@
 """Main entry point: fetch, filter, dedup, and email new rental matches.
 
 Usage:
-    python check_listings.py              # normal run: emails new matches
-    python check_listings.py --dry-run    # print what would be sent, no email, no state write
-    python check_listings.py --test-email # send one synthetic listing to verify email delivery/template
+    python check_listings.py                  # normal run: emails new matches
+    python check_listings.py --dry-run        # print what would be sent, no email, no state write
+    python check_listings.py --test-email     # send one synthetic listing to verify email delivery/template
+    python check_listings.py --send-all-matches  # email every currently matching listing, ignoring dedup state
 """
 
 import argparse
@@ -80,6 +81,12 @@ def main():
         action="store_true",
         help="Send one synthetic test listing to verify delivery/template, bypassing scraping/filtering/dedup",
     )
+    parser.add_argument(
+        "--send-all-matches",
+        action="store_true",
+        help="Scrape and filter for real, then email every currently matching listing "
+        "(not just ones new since the last run) — ignores and does not update dedup state",
+    )
     args = parser.parse_args()
 
     if args.test_email:
@@ -92,6 +99,15 @@ def main():
     all_listings = gather_all_listings()
     matches = filters.apply_all(all_listings)
     print(f"{len(matches)} listing(s) pass the Metrodom Green filters")
+
+    if args.send_all_matches:
+        if not matches:
+            print("No current matches — no email sent.")
+            return 0
+        for m in matches:
+            filters.enrich_for_display(m)
+        send_email(matches)
+        return 0
 
     seen = load_seen()
     new_matches = [m for m in matches if m.dedup_key() not in seen]

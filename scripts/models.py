@@ -28,9 +28,18 @@ class Listing:
 
     # Filled in by filters.py — None means "could not be determined from
     # the listing text", not "fails the filter".
-    furnished_status: Optional[str] = None   # "full" | "partial" | None
+    furnished_status: Optional[str] = None   # "full" | "partial" | "none" | None
     has_outdoor_space: Optional[bool] = None
     move_in_ok: Optional[bool] = None
+
+    # Display-only enrichment, filled in by filters.enrich_for_display()
+    # right before a listing is emailed — never used for filtering,
+    # matching, or dedup, so populating these late doesn't affect any of
+    # that. None means "not detected", not "confirmed absent".
+    district: Optional[str] = None          # e.g. "IX. kerület"
+    display_name: Optional[str] = None      # title with any district prefix stripped
+    street_address: Optional[str] = None    # a real street address, if found
+    orientation: Optional[str] = None       # "north" | "south" | ... | None
 
     notes: list = field(default_factory=list)
 

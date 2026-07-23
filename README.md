@@ -222,11 +222,63 @@ Facebook-sourced alerts, and it costs nothing to set up.
 
 Search-result pages rarely spell out every detail. When a listing's text
 doesn't mention furnishing, a terrace, or a move-in date, the listing is
-**kept** (not silently dropped) and flagged in the email as "verify
-manually" for that field, rather than risking a false negative from an
-imperfect text match. A listing IS dropped if the text explicitly says
-"no terrace/balcony" equivalent, or states a move-in date earlier than
-your configured earliest date.
+**kept** (not silently dropped) rather than risking a false negative from
+an imperfect text match — internally it's tracked as "unconfirmed", but
+the email itself simply omits that field rather than calling out that
+something is missing (see "Email format" below). A listing IS dropped if
+the text explicitly says "no terrace/balcony" equivalent, or states a
+move-in date earlier than your configured earliest date.
+
+## Email format
+
+The notification email is written entirely in Hungarian, one block per
+new match, separated by a `━━━` rule:
+
+```
+🔔 3 új találat érkezett a(z) „Metrodom Green / Cordia Woodland” kereséshez
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📍 IX. kerület • Vágóhíd utca - 65 m2, 3 szoba
+💰 Bérleti díj: 260 000 Ft / hó
+📐 Alapterület: 65 m²
+🛏️ Szobák száma: 3
+🧭 Tájolás: Dél
+🛋️ Bútorozottság: Teljesen bútorozott
+🌍 Forrás: alberlet.hu
+🔗 https://www.alberlet.hu/kiado-alberlet/...
+```
+
+Each field is only shown when there's a real value for it — a listing
+with no detected orientation just has no `🧭` line, never a placeholder
+like "N/A" or "not stated". This is deliberate:
+
+- **Missing-data notes are never shown.** Older versions of this project
+  showed things like "furnished status not stated — verify manually" in
+  the email. That's gone — if it's not known, the field is just absent.
+  The one exception is the district-level-match caveat (for
+  albifigyelo.hu/megveszlak.hu matches), which is a genuine confidence
+  warning, not a missing-data placeholder, so it still appears under
+  `ℹ️ Megjegyzések` when relevant.
+- **The address line never repeats the headline.** `📍` at the top of a
+  block is always shown (district + building/street name, derived from
+  the listing's title/text); a second `📍 Cím:` line for the literal
+  street address only appears when it adds real information beyond what
+  the headline already says — see `filters.compute_display_fields()`.
+- **Orientation and unfurnished detection are new, source-agnostic
+  keyword checks** (`filters.detect_orientation()`, the "bútorozatlan"
+  branch of `detect_furnished()`) — they run on whatever description text
+  a source already provides, the same way furnished/terrace/move-in
+  detection always has. No scraper was changed to add new fields; sources
+  that never mention orientation in their listing text just won't show a
+  `🧭` line, which is the correct behavior, not a gap to fix.
+- **Price/size/room formatting is normalized** regardless of a source's
+  raw text quirks ("180e Ft", "220000 HUF/hónap", "220 000 Ft/hó" all
+  render as "220 000 Ft / hó") by reusing `filters.parse_price_huf()` —
+  the same parser already used for the `MAX_RENT_HUF` hard filter, not a
+  second, separately-maintained parser.
+
+All of this enrichment (`filters.enrich_for_display()`) runs once, right
+before a listing is emailed — it never affects which listings pass
+filtering, how they're deduped, or how they're ranked.
 
 ## Setup
 

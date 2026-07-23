@@ -47,6 +47,7 @@ FLATCO_BUILDING_NAME = "metrodom green"
 # Keywords (case-insensitive, Hungarian) used to detect furnishing status.
 FURNISHED_KEYWORDS = ["bútorozott", "butorozott", "berendezett", "felszerelt"]
 PARTIALLY_FURNISHED_KEYWORDS = ["részben bútorozott", "reszben butorozott"]
+UNFURNISHED_KEYWORDS = ["bútorozatlan", "butorozatlan"]
 
 # Keywords used to detect a terrace/balcony.
 OUTDOOR_SPACE_KEYWORDS = ["erkély", "erkely", "terasz", "loggia"]
@@ -78,6 +79,13 @@ FRESHNESS_WINDOW_MINUTES = 90
 
 EMAIL_TO = "viktorszspam@gmail.com"
 EMAIL_SUBJECT_PREFIX = "[Metrodom Green tracker]"
+
+# Human-readable name shown in the Hungarian email header ("N új találat
+# érkezett a(z) „{SEARCH_DISPLAY_NAME}” kereséshez"). Update this if the
+# set of tracked buildings in ADDRESS_KEYWORDS changes — it's a separate
+# value rather than derived automatically since "Metrodom Green / Cordia
+# Woodland" isn't something worth reconstructing from keyword internals.
+SEARCH_DISPLAY_NAME = "Metrodom Green / Cordia Woodland"
 
 # Query text for the Facebook Marketplace no-op check (see
 # scripts/scrapers/facebook.py for why this can only ever be a best-effort,

@@ -89,6 +89,11 @@ def price_ok(listing: Listing) -> bool:
 
 def detect_furnished(text: str) -> Optional[str]:
     text = (text or "").lower()
+    # Checked before the plain "furnished" keywords since "bútorozatlan"
+    # ("unfurnished") contains "bútor" but is a distinct, opposite claim —
+    # order matters here, not just presence.
+    if text_matches_any(text, config.UNFURNISHED_KEYWORDS):
+        return "none"
     if text_matches_any(text, config.PARTIALLY_FURNISHED_KEYWORDS):
         return "partial"
     if text_matches_any(text, config.FURNISHED_KEYWORDS):
@@ -120,6 +125,29 @@ def detect_move_in_ok(text: str) -> Optional[bool]:
         target = (config.EARLIEST_MOVE_IN_YEAR, config.EARLIEST_MOVE_IN_MONTH)
         return (year, month) >= target
     return None  # not stated, needs a manual check
+
+
+# Compound directions checked before simple ones, since e.g. "délnyugati"
+# contains "nyugati" as a substring — checking simple directions first
+# would lose the "south" component and misreport it as plain "west".
+_ORIENTATION_KEYWORDS = [
+    (["északkeleti", "észak-keleti"], "northeast"),
+    (["északnyugati", "észak-nyugati"], "northwest"),
+    (["délkeleti", "dél-keleti"], "southeast"),
+    (["délnyugati", "dél-nyugati"], "southwest"),
+    (["északi"], "north"),
+    (["déli"], "south"),
+    (["keleti"], "east"),
+    (["nyugati"], "west"),
+]
+
+
+def detect_orientation(text: str) -> Optional[str]:
+    text = (text or "").lower()
+    for keywords, value in _ORIENTATION_KEYWORDS:
+        if text_matches_any(text, keywords):
+            return value
+    return None  # not stated — omitted from display, not shown as unknown
 
 
 def annotate(listing: Listing) -> Listing:
@@ -178,3 +206,101 @@ def apply_all(listings):
         if passes_hard_filters(listing) and passes_soft_filters(listing):
             matches.append(listing)
     return matches
+
+
+# --- Display-only enrichment ------------------------------------------------
+#
+# Everything below derives extra fields (district, a real street address,
+# orientation) for the email template. None of it runs as part of
+# apply_all() and none of it can change which listings pass filtering,
+# how they're deduped, or how they're ranked/ordered — it's called
+# separately, only on listings that have already been selected as new
+# matches, purely to make the notification nicer. See emailer.py.
+
+_VALID_BUDAPEST_DISTRICTS = {
+    "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X",
+    "XI", "XII", "XIII", "XIV", "XV", "XVI", "XVII", "XVIII", "XIX", "XX",
+    "XXI", "XXII", "XXIII",
+}
+
+# Anchored to the start of the text: sources like tappancsosotthon.hu
+# title their listings "IV. Metrodom Panoráma" / "VII. Csányi utca" —
+# district prefix, then the actual building/street name.
+_LEADING_DISTRICT_RE = re.compile(r"^([IVXLCM]+)\.\s+(.+)$")
+# Unanchored: general "... Budapest, IX. kerület" style mentions anywhere
+# in address/description text.
+_DISTRICT_MENTION_RE = re.compile(r"\b([IVXLCM]+)\.\s*ker(?:ület)?\b", re.IGNORECASE)
+
+# Deliberately conservative — words that are unambiguously a street/square
+# type in Hungarian, not neighborhood or development names (which can
+# coincidentally end in similar-sounding words). Under-detecting a real
+# address is preferable to mislabeling a neighborhood/project name as a
+# street and repeating it as if it were new information.
+_STREET_SUFFIX_RE = re.compile(
+    r"\b(utca|út|körút|tér|sétány|köz|dűlő|fasor|rakpart)\b", re.IGNORECASE
+)
+
+
+def _looks_like_street_address(text: str) -> bool:
+    return bool(_STREET_SUFFIX_RE.search(text or ""))
+
+
+def compute_display_fields(listing: Listing) -> dict:
+    """Derive (district, name, street_address) for the email template from
+    already-parsed listing text. Pure function — makes no assumptions
+    beyond what the listing already carries, and never fabricates a value
+    it can't support with text actually present on the listing.
+
+    street_address is deliberately suppressed (set to None) whenever it
+    would just repeat text already shown in the headline (district +
+    name) — e.g. tappancsosotthon.hu's "VII. Csányi utca" already puts
+    the street name in the headline via the leading-district split, and
+    alberlet.hu's headline already leads with the street name too, so a
+    separate "Cím: Csányi utca" / "Cím: Vágóhíd utca" line underneath
+    would add no new information, only repeat it. This favors never
+    repeating information over always showing an address line."""
+    title = (listing.title or "").strip()
+
+    leading_match = _LEADING_DISTRICT_RE.match(title)
+    if leading_match and leading_match.group(1) in _VALID_BUDAPEST_DISTRICTS:
+        district = f"{leading_match.group(1)}. kerület"
+        name = leading_match.group(2).strip()
+    else:
+        name = title or listing.address_text.strip() or "Ismeretlen ingatlan"
+        district = None
+        mention = _DISTRICT_MENTION_RE.search(
+            f"{title} {listing.address_text} {listing.description_text}"
+        )
+        if mention and mention.group(1).upper() in _VALID_BUDAPEST_DISTRICTS:
+            district = f"{mention.group(1).upper()}. kerület"
+
+    street_address = None
+    if _looks_like_street_address(listing.address_text or ""):
+        # Isolate the street portion from formats like "Vágóhíd utca
+        # Budapest, IX. kerület" — take whatever precedes the district/city
+        # mention rather than showing the whole blob.
+        candidate = re.split(r"\bBudapest\b|,", listing.address_text, maxsplit=1)[0].strip()
+        street_address = candidate or None
+    elif _looks_like_street_address(name):
+        street_address = name
+
+    if street_address and (
+        street_address.lower() in name.lower()
+        or (district and street_address.lower() == district.lower())
+    ):
+        street_address = None
+
+    return {"district": district, "name": name, "street_address": street_address}
+
+
+def enrich_for_display(listing: Listing) -> Listing:
+    """Populates district/street_address/orientation for one listing,
+    right before it's emailed. Safe to call multiple times; never touches
+    anything used by filtering, matching, or dedup."""
+    fields = compute_display_fields(listing)
+    listing.district = fields["district"]
+    listing.display_name = fields["name"]
+    listing.street_address = fields["street_address"]
+    combined_text = f"{listing.description_text} {listing.title}"
+    listing.orientation = detect_orientation(combined_text)
+    return listing

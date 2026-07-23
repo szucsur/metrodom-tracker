@@ -73,6 +73,8 @@ def main():
         print("--dry-run set: not sending email or updating state.")
         return 0
 
+    for m in new_matches:
+        filters.enrich_for_display(m)
     send_email(new_matches)
 
     seen.update(m.dedup_key() for m in new_matches)

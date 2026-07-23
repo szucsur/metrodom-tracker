@@ -25,6 +25,7 @@ SCRAPER_MODULE_NAMES = [
     "megveszlak",
     "tappancsosotthon",
     "maxapro",
+    "koltozzbe",
 ]
 
 

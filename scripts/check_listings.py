@@ -26,6 +26,7 @@ from scrapers import (
     megveszlak,
     tappancsosotthon,
     maxapro,
+    koltozzbe,
 )
 from state import load_seen, save_seen
 
@@ -65,6 +66,7 @@ def gather_all_listings():
         megveszlak,
         tappancsosotthon,
         maxapro,
+        koltozzbe,
     ):
         try:
             found = scraper.fetch()

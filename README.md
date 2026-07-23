@@ -384,3 +384,12 @@ Edit `scripts/config.py`:
   regex from that text. An ad where the description doesn't happen to
   state size/rooms in a recognizable form fails the hard filter, the same
   way an unparseable price already does elsewhere.
+- `koltozzbe.hu` is verified working: its per-district list page
+  (`https://koltozzbe.hu/kiado-lakas-alberlet-budapest-ix-kerulet`) is
+  plain server-rendered HTML, one `<div class="listing-card">` per
+  listing, with clean structured fields (`data-lid` for the ID,
+  `listing-rooms`/`listing-size` for room count/floor area) — no
+  free-text regex needed for those, unlike maxapro.hu. Room counts are
+  sometimes given as Hungarian "N + M szoba" notation (e.g. "2 + 1
+  szoba" for two full rooms plus a half-room); `koltozzbe.py` sums all
+  digit groups in that field to get a total room count.

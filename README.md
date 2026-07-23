@@ -231,6 +231,13 @@ move-in date earlier than your configured earliest date.
 
 ## Email format
 
+The subject line is a fixed, project-agnostic Hungarian format —
+`🏡 Lakásfigyelő: {N} új találat` (e.g. `🏡 Lakásfigyelő: 1 új találat`,
+`🏡 Lakásfigyelő: 4 új találat`) — deliberately independent of
+`SEARCH_DISPLAY_NAME` or any tracked address, so it stays short and
+readable on mobile regardless of which building(s) `config.py` is
+pointed at.
+
 The notification email is written entirely in Hungarian, one block per
 new match, separated by a `━━━` rule:
 
@@ -346,7 +353,8 @@ Edit `scripts/config.py`:
   (only relevant if you're tracking a Metrodom-managed building)
 - `FURNISHED_KEYWORDS`, `OUTDOOR_SPACE_KEYWORDS` — soft-filter keywords
 - `EARLIEST_MOVE_IN_YEAR` / `EARLIEST_MOVE_IN_MONTH` — move-in cutoff
-- `EMAIL_TO` — recipient address
+- `EMAIL_TO` — list of recipient addresses (every notification email is
+  sent to all of them)
 
 ## Notes on reliability
 

@@ -115,8 +115,10 @@ HUNGARIAN_MONTHS = {
 # on-disk "seen" state file for deduplication.
 FRESHNESS_WINDOW_MINUTES = 90
 
-EMAIL_TO = "viktorszucs1@gmail.com"
-EMAIL_SUBJECT_PREFIX = "[Metrodom Green tracker]"
+# List of recipient addresses — every notification email is sent to all
+# of them. Kept as a list (not a single string) so adding/removing a
+# recipient never requires touching emailer.py.
+EMAIL_TO = ["viktorszucs1@gmail.com", "horvathpeetra@gmail.com"]
 
 # Human-readable name shown in the Hungarian email header ("N új találat
 # érkezett a(z) „{SEARCH_DISPLAY_NAME}” kereséshez"). Update this if the

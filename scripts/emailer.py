@@ -126,8 +126,10 @@ def format_email_body(listings) -> str:
     return "\n".join(parts)
 
 
-def send_email(listings, to_address: str = None) -> bool:
+def send_email(listings, to_address=None) -> bool:
     to_address = to_address or config.EMAIL_TO
+    recipients = [to_address] if isinstance(to_address, str) else list(to_address)
+
     gmail_address = os.environ.get("GMAIL_ADDRESS")
     app_password = os.environ.get("GMAIL_APP_PASSWORD")
 
@@ -139,17 +141,17 @@ def send_email(listings, to_address: str = None) -> bool:
         print(format_email_body(listings))
         return False
 
-    subject = f"{config.EMAIL_SUBJECT_PREFIX} {len(listings)} új találat"
+    subject = f"🏡 Lakásfigyelő: {len(listings)} új találat"
     body = format_email_body(listings)
 
     msg = MIMEText(body, "plain", "utf-8")
     msg["Subject"] = subject
     msg["From"] = gmail_address
-    msg["To"] = to_address
+    msg["To"] = ", ".join(recipients)
 
     with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
         server.login(gmail_address, app_password)
-        server.sendmail(gmail_address, [to_address], msg.as_string())
+        server.sendmail(gmail_address, recipients, msg.as_string())
 
-    print(f"Sent email with {len(listings)} match(es) to {to_address}")
+    print(f"Sent email with {len(listings)} match(es) to {', '.join(recipients)}")
     return True

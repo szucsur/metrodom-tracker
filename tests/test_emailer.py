@@ -1,6 +1,20 @@
+import smtplib
+from email import message_from_string
+from email.header import decode_header
+
+import config
 import emailer
 import filters
 from models import Listing
+
+
+def _decoded_subject(raw_message: str) -> str:
+    parsed = message_from_string(raw_message)
+    parts = decode_header(parsed["Subject"])
+    return "".join(
+        text.decode(charset or "ascii") if isinstance(text, bytes) else text
+        for text, charset in parts
+    )
 
 
 def make_listing(**overrides):
@@ -114,3 +128,54 @@ def test_send_email_without_credentials_does_not_raise(monkeypatch, capsys):
     assert result is False
     captured = capsys.readouterr()
     assert "skipping send" in captured.out
+
+
+class _FakeSMTP:
+    sent = []
+
+    def __init__(self, *args, **kwargs):
+        pass
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        return False
+
+    def login(self, address, password):
+        pass
+
+    def sendmail(self, from_addr, to_addrs, message):
+        _FakeSMTP.sent.append((from_addr, list(to_addrs), message))
+
+
+def test_send_email_delivers_to_every_configured_recipient(monkeypatch):
+    monkeypatch.setenv("GMAIL_ADDRESS", "sender@example.com")
+    monkeypatch.setenv("GMAIL_APP_PASSWORD", "app-password")
+    monkeypatch.setattr(config, "EMAIL_TO", ["a@example.com", "b@example.com"])
+    _FakeSMTP.sent = []
+    monkeypatch.setattr(smtplib, "SMTP_SSL", _FakeSMTP)
+
+    result = emailer.send_email([make_listing()])
+    assert result is True
+
+    from_addr, to_addrs, message = _FakeSMTP.sent[0]
+    assert to_addrs == ["a@example.com", "b@example.com"]
+    parsed = message_from_string(message)
+    assert parsed["To"] == "a@example.com, b@example.com"
+
+
+def test_send_email_subject_is_fixed_hungarian_format_independent_of_project(monkeypatch):
+    monkeypatch.setenv("GMAIL_ADDRESS", "sender@example.com")
+    monkeypatch.setenv("GMAIL_APP_PASSWORD", "app-password")
+    monkeypatch.setattr(config, "EMAIL_TO", ["a@example.com"])
+    _FakeSMTP.sent = []
+    monkeypatch.setattr(smtplib, "SMTP_SSL", _FakeSMTP)
+
+    for count, expected in [(1, "🏡 Lakásfigyelő: 1 új találat"), (4, "🏡 Lakásfigyelő: 4 új találat"), (12, "🏡 Lakásfigyelő: 12 új találat")]:
+        listings = [make_listing(listing_id=str(i)) for i in range(count)]
+        emailer.send_email(listings)
+        _, _, message = _FakeSMTP.sent[-1]
+        subject = _decoded_subject(message)
+        assert subject == expected
+        assert config.SEARCH_DISPLAY_NAME not in subject

@@ -52,7 +52,22 @@ jobs:
                   print(json.dumps(data["itemListElement"][0], indent=2, ensure_ascii=False))
                   print(f"total items in list: {len(data['itemListElement'])}")
 
-          first_card_link = soup.find("a", href=True, class_=lambda c: c and "card" in c.lower())
-          print("=== sample card-ish link class ===")
-          print(first_card_link)
+          import re
+          links = [a for a in soup.find_all("a", href=True) if re.search(r"/h\d+$", a["href"])]
+          print(f"listing detail links found: {len(links)}")
+          seen_hrefs = set()
+          for a in links:
+              if a["href"] in seen_hrefs:
+                  continue
+              seen_hrefs.add(a["href"])
+              print("--- LINK ---")
+              print("href:", a["href"])
+              print("classes:", a.get("class"))
+              container = a
+              for _ in range(5):
+                  if container.parent:
+                      container = container.parent
+              print("ancestor(5) snippet:")
+              print(str(container)[:2500])
+              print()
           PYEOF

@@ -42,13 +42,7 @@ jobs:
           print("LENGTH:", len(resp.text))
 
           soup = BeautifulSoup(resp.text, "html.parser")
-          for keyword in ["Alapterület", "alapterulet", "Szobák sz", "szoba", "m²", "m2"]:
-              for el in soup.find_all(string=re.compile(keyword, re.IGNORECASE)):
-                  parent = el.parent
-                  for _ in range(2):
-                      if parent.parent:
-                          parent = parent.parent
-                  snippet = str(parent)[:500]
-                  print(f"--- MATCH for '{keyword}' ---")
-                  print(snippet)
+          extra = soup.find("ul", id="divolgoExtraDataList")
+          print("=== divolgoExtraDataList full content ===")
+          print(str(extra))
           PYEOF

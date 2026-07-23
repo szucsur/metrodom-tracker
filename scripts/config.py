@@ -78,3 +78,10 @@ FRESHNESS_WINDOW_MINUTES = 90
 
 EMAIL_TO = "viktorszspam@gmail.com"
 EMAIL_SUBJECT_PREFIX = "[Metrodom Green tracker]"
+
+# Query text for the Facebook Marketplace no-op check (see
+# scripts/scrapers/facebook.py for why this can only ever be a best-effort,
+# unauthenticated check, not a real integration). Derived from the primary
+# address keyword rather than hardcoded, so it stays in sync with whatever
+# building this tracker is actually pointed at.
+FACEBOOK_SEARCH_QUERY = ADDRESS_KEYWORDS[0]

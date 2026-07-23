@@ -1,2 +1,11 @@
 __pycache__/
 *.pyc
+
+# Guardrail: this tracker never stores Facebook/Marketplace session,
+# cookie, or credential data (see scripts/scrapers/facebook.py) — these
+# patterns exist so one never gets committed by accident if that ever
+# changes.
+*facebook*session*
+*facebook*cookie*
+fb_cookies*
+.pytest_cache/

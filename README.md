@@ -11,8 +11,10 @@ utca, Budapest 1097, but the filters in `scripts/config.py` are just data
 1. **Fetches** current listings from `ingatlan.com`, `alberlet.hu`,
    `flatco.hu` (Metrodom's own property management site), `rentingo.com`,
    `albifigyelo.hu` (a nationwide listing aggregator), `rentola.hu`,
-   `oc.hu` (Otthon Centrum), `megveszlak.hu`, and `tappancsosotthon.hu`
-   ("Rent with Paws", a pet-friendly rental agency).
+   `oc.hu` (Otthon Centrum), `megveszlak.hu`, `tappancsosotthon.hu`
+   ("Rent with Paws", a pet-friendly rental agency), and Facebook
+   Marketplace (integrated as a source, but a documented no-op — see
+   below for why).
 2. **Filters** for:
    - Address/building keyword match (default: Vágóhíd utca / Metrodom
      Green / Cordia Woodland)
@@ -175,16 +177,42 @@ sale prices are quoted in millions of forints, which the price parser
 used by `MAX_RENT_HUF` doesn't recognize as a rental amount, so one
 slipping past the slug check would still fail the hard price filter.
 
-## What this deliberately does NOT do: Facebook/Marketplace scraping
+## Facebook Marketplace: integrated as a source, but a documented no-op
 
-Facebook's Terms of Service prohibit automated data collection from its
-products, and Marketplace/Group content only renders for a logged-in
-session. `scripts/scrapers/facebook.py` makes one unauthenticated,
-no-login request and — as expected — will almost always come back empty,
-because Facebook serves anonymous requests a login wall. It does not log
-in, hold a session, or try to evade Facebook's bot detection.
+Facebook is wired into the pipeline exactly like every other source —
+`scripts/scrapers/facebook.py` is a real module in `scripts/scrapers/`,
+imported and called by `check_listings.py` the same way, on the same
+schedule, feeding the same `Listing` schema into the same filters/dedup/
+email path. There's no separate Facebook-specific code path anywhere
+else in the project.
 
-**For Facebook coverage, use Facebook's own tools instead**: open
+What it can't do is fetch real listings, and that's by design, not a
+missing feature:
+
+- **No public API.** Facebook's Graph API surface for Marketplace search
+  was withdrawn from general developer access years ago. There's nothing
+  an individual can apply for that exposes peer-to-peer rental listings.
+- **Marketplace requires a login.** Confirmed directly against the live
+  site: an unauthenticated request to a Marketplace search URL is
+  redirected to a login wall. That's not a bug to work around — it's the
+  actual behavior being checked for and handled.
+- **The only path to real data would violate Facebook's ToS.** Getting
+  past that login wall would mean automating a session that's actually
+  authenticated, which is automated data collection from Facebook's
+  products without permission — prohibited by Facebook's Terms of
+  Service regardless of whether the automation is "well-behaved" (no
+  CAPTCHA-solving, no fingerprint spoofing, no anti-bot evasion). This
+  project won't build that, on principle, not because it'd be hard.
+
+So `scripts/scrapers/facebook.py` issues one plain, unauthenticated GET,
+detects the login-wall redirect, logs it, and returns an empty list — the
+same contract every other scraper honors when a source is unreachable.
+It never logs in, holds a session or cookie jar, or stores any Facebook
+credential/session data; `.gitignore` carries explicit patterns for
+Facebook session/cookie files as a guardrail against that ever landing in
+the repo by accident, even though nothing here creates one today.
+
+**For real Facebook coverage, use Facebook's own tools instead**: open
 Marketplace, search "Vágóhíd utca" or "Metrodom Green", save the search,
 and turn on notifications. Do the same for local Budapest rental
 Facebook groups you're a member of. That's the reliable way to get
@@ -223,6 +251,36 @@ python scripts/check_listings.py             # real run: emails new matches, upd
 `GMAIL_ADDRESS` / `GMAIL_APP_PASSWORD` must be set as environment
 variables for a real (non-dry-run) run to actually send email; without
 them the script prints what it would have sent instead of failing.
+
+## Testing
+
+```bash
+pip install -r requirements-dev.txt
+pytest tests/
+```
+
+The suite runs entirely offline (no live requests to any source) and
+covers:
+
+- **`tests/test_scraper_contract.py`** — every module in `scripts/scrapers/`
+  exposes `fetch()`, never raises even with no network access, and is
+  actually wired into `check_listings.py`'s single pipeline.
+- **`tests/test_facebook_scraper.py`** — pins down the Facebook adapter's
+  no-op contract with mocked responses (login-wall detection, no
+  parsing of an unexpected 200), plus a static guard that the module
+  never references session/cookie/login machinery.
+- **`tests/test_filters.py`** — hard/soft filter behavior, including
+  regression coverage for the "bare brand name matches the wrong
+  building" bug class (Metrodom/Cordia) and the price-cap parser across
+  every source's price-text format.
+- **`tests/test_state.py`** — dedup state round-trips and survives a
+  missing or corrupt state file.
+- **`tests/test_emailer.py`** — email body formatting and the
+  no-credentials-configured fallback path.
+
+`requirements-dev.txt` layers `pytest` on top of the production
+`requirements.txt` — the hourly workflow only installs the latter, so
+test-only dependencies never affect the scheduled run.
 
 ## Adapting to a different building or area
 

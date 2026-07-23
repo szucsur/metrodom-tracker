@@ -375,3 +375,12 @@ Edit `scripts/config.py`:
 - `megveszlak.hu` is verified working: its per-district list page is
   plain server-rendered HTML, parsed via listing-card CSS classes
   (`hirdetes_item_ar`/`hirdetes_item_cim`/`hirdetes_item_meretekdiv`).
+- `maxapro.hu` is verified working: its per-district list page
+  (`https://maxapro.hu/budapest-ix-kerulet/kiado-haz-lakas`) is plain
+  server-rendered HTML, one `<li class="srBlock">` card per listing.
+  Unlike alberlet.hu/megveszlak.hu, size and room count aren't exposed as
+  separate fields on the list page — only in the free-text ad description
+  (`srDesc`, often truncated there) — so `maxapro.py` extracts them via
+  regex from that text. An ad where the description doesn't happen to
+  state size/rooms in a recognizable form fails the hard filter, the same
+  way an unparseable price already does elsewhere.

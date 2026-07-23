@@ -24,7 +24,9 @@ jobs:
       - name: Fetch and inspect
         run: |
           python3 - <<'PYEOF'
+          import re
           import requests
+          from bs4 import BeautifulSoup
 
           url = "${{ inputs.url }}"
           headers = {
@@ -38,6 +40,17 @@ jobs:
           resp = requests.get(url, headers=headers, timeout=20)
           print("STATUS:", resp.status_code)
           print("LENGTH:", len(resp.text))
-          print("=== FIRST 8000 CHARS ===")
-          print(resp.text[:8000])
+
+          soup = BeautifulSoup(resp.text, "html.parser")
+          links = [a for a in soup.find_all("a", href=True) if re.search(r"kiado-lakas-budapest", a["href"])]
+          print(f"listing-like links found: {len(links)}")
+          for a in links[:3]:
+              print("--- LINK ---")
+              print("href:", a["href"])
+              container = a
+              for _ in range(4):
+                  if container.parent:
+                      container = container.parent
+              print("ancestor(4) HTML snippet:")
+              print(str(container)[:3000])
           PYEOF

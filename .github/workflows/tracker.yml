@@ -4,7 +4,12 @@ on:
   schedule:
     # Runs hourly. GitHub only triggers `schedule` on the default branch.
     - cron: "0 * * * *"
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      test_email:
+        description: "Send one synthetic test listing instead of a real run (verifies SMTP delivery/template only)"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -36,7 +41,7 @@ jobs:
           GMAIL_ADDRESS: ${{ secrets.GMAIL_ADDRESS }}
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
           PYTHONPATH: scripts
-        run: python scripts/check_listings.py
+        run: python scripts/check_listings.py ${{ inputs.test_email && '--test-email' || '' }}
 
       - name: Commit updated dedup state
         run: |

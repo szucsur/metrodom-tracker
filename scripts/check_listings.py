@@ -2,8 +2,9 @@
 """Main entry point: fetch, filter, dedup, and email new rental matches.
 
 Usage:
-    python check_listings.py            # normal run: emails new matches
-    python check_listings.py --dry-run  # print what would be sent, no email, no state write
+    python check_listings.py              # normal run: emails new matches
+    python check_listings.py --dry-run    # print what would be sent, no email, no state write
+    python check_listings.py --test-email # send one synthetic listing to verify email delivery/template
 """
 
 import argparse
@@ -11,6 +12,7 @@ import sys
 
 import filters
 from emailer import send_email
+from models import Listing
 from scrapers import (
     ingatlan,
     alberlet,
@@ -24,6 +26,27 @@ from scrapers import (
     tappancsosotthon,
 )
 from state import load_seen, save_seen
+
+
+def build_test_listing() -> Listing:
+    """A synthetic, clearly-labeled listing used only by --test-email to
+    verify SMTP delivery and the notification template — never touches
+    scraping, filtering, dedup state, or any real source."""
+    return Listing(
+        source="teszt",
+        listing_id="test-email",
+        url="https://example.com/teszt-hirdetes",
+        title="TESZT üzenet — Metrodom Green",
+        price_text="280 000 Ft/hó",
+        size_sqm=45.0,
+        rooms=2.0,
+        address_text="Vágóhíd utca Budapest, IX. kerület",
+        description_text=(
+            "Ez egy teszt hirdetés a lakáskereső email-sablonjának "
+            "ellenőrzésére. Teljesen bútorozott, déli fekvésű, azonnal "
+            "költözhető."
+        ),
+    )
 
 
 def gather_all_listings():
@@ -52,7 +75,19 @@ def gather_all_listings():
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--dry-run", action="store_true", help="Don't send email or update dedup state")
+    parser.add_argument(
+        "--test-email",
+        action="store_true",
+        help="Send one synthetic test listing to verify delivery/template, bypassing scraping/filtering/dedup",
+    )
     args = parser.parse_args()
+
+    if args.test_email:
+        listing = build_test_listing()
+        filters.annotate(listing)
+        filters.enrich_for_display(listing)
+        send_email([listing])
+        return 0
 
     all_listings = gather_all_listings()
     matches = filters.apply_all(all_listings)

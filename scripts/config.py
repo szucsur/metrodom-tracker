@@ -77,7 +77,7 @@ HUNGARIAN_MONTHS = {
 # on-disk "seen" state file for deduplication.
 FRESHNESS_WINDOW_MINUTES = 90
 
-EMAIL_TO = "viktorszspam@gmail.com"
+EMAIL_TO = "viktorszucs1@gmail.com"
 EMAIL_SUBJECT_PREFIX = "[Metrodom Green tracker]"
 
 # Human-readable name shown in the Hungarian email header ("N új találat

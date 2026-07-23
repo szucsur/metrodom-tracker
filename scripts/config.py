@@ -16,16 +16,23 @@ ADDRESS_KEYWORDS = [
     "cordia woodland lakópark",
     "nádasdy",
     "nadasdy",
+    "metrodom city home",
+    "metrodom citihome",
 ]
-# Deliberately NOT including bare "metrodom", bare "cordia", "metrodom city
-# home"/"metrodom citihome", "metrodom lakópark", "cordia lakópark", or
-# "green lakópark" here: several other buildings share each brand (Metrodom
-# River/Park/Panoráma/City Home/etc.; Cordia develops many unrelated
-# projects across Budapest; "Green"/"Lakópark" are generic marketing
-# words), and a loose brand-only match would short-circuit
-# location_matches() into treating any of them as a target building — this
-# bit us for real once a source (tappancsosotthon.hu) listed multiple
-# Metrodom buildings at once. The specific complex names above are enough.
+# "Metrodom City Home" is the marketing name for the building at the
+# Nádasdy utca address (confirmed with the user) — both spellings ("City
+# Home" / "Citihome") are listed since it's not a pure substring of
+# "nádasdy" the way street-number variants are.
+#
+# Deliberately NOT including bare "metrodom", bare "cordia", "metrodom
+# lakópark", "cordia lakópark", or "green lakópark" here: several other
+# buildings share each brand (Metrodom River/Park/Panoráma/etc.; Cordia
+# develops many unrelated projects across Budapest; "Green"/"Lakópark" are
+# generic marketing words), and a loose brand-only match would
+# short-circuit location_matches() into treating any of them as a target
+# building — this bit us for real once a source (tappancsosotthon.hu)
+# listed multiple Metrodom buildings at once. The specific complex/building
+# names above are enough.
 #
 # Also deliberately NOT listing every "Vágóhíd utca"/"Nádasdy utca" spelling
 # variant (Vágóhíd u., Vágóhíd utca 12-14, 1097 Budapest Vágóhíd utca 9,

@@ -38,16 +38,18 @@ def test_other_metrodom_building_is_rejected():
     assert not filters.passes_hard_filters(listing)
 
 
-def test_metrodom_city_home_is_rejected():
-    # This is literally the other false-positive building from the same
-    # earlier incident — must never be re-included via a broader keyword
-    # expansion.
+def test_metrodom_city_home_matches_as_the_nadasdy_utca_building():
+    # "Metrodom City Home" turned out to be the marketing name for the
+    # building at the Nádasdy utca address (confirmed with the user), not
+    # an unrelated Metrodom building — unlike "IV. Metrodom Panoráma" and
+    # "IX. Metrodom City Home" was previously (incorrectly) treated as one
+    # of those false positives; it's now an explicit ADDRESS_KEYWORDS entry.
     listing = make_listing(
         title="IX. Metrodom City Home",
         address_text="IX. Metrodom City Home",
         description_text="IX. Metrodom City Home, Budapest IX. kerület",
     )
-    assert not filters.passes_hard_filters(listing)
+    assert filters.passes_hard_filters(listing)
 
 
 def test_bare_cordia_and_generic_lakopark_brands_are_rejected():

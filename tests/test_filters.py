@@ -38,6 +38,121 @@ def test_other_metrodom_building_is_rejected():
     assert not filters.passes_hard_filters(listing)
 
 
+def test_metrodom_city_home_is_rejected():
+    # This is literally the other false-positive building from the same
+    # earlier incident — must never be re-included via a broader keyword
+    # expansion.
+    listing = make_listing(
+        title="IX. Metrodom City Home",
+        address_text="IX. Metrodom City Home",
+        description_text="IX. Metrodom City Home, Budapest IX. kerület",
+    )
+    assert not filters.passes_hard_filters(listing)
+
+
+def test_bare_cordia_and_generic_lakopark_brands_are_rejected():
+    cases = [
+        "Cordia Lakópark",
+        "Metrodom Lakópark",
+        "Green Lakópark",
+    ]
+    for text in cases:
+        listing = make_listing(
+            title=text,
+            address_text=f"{text}, Budapest IX. kerület",
+            description_text=f"{text}, Budapest IX. kerület",
+        )
+        assert not filters.passes_hard_filters(listing), text
+
+
+def test_metrodom_green_lakopark_full_name_matches():
+    listing = make_listing(
+        title="Kiadó lakás a Metrodom Green Lakóparkban",
+        address_text="Vágóhíd utca Budapest, IX. kerület",
+        description_text="Metrodom Green Lakópark, IX. kerület",
+    )
+    assert filters.passes_hard_filters(listing)
+
+
+def test_cordia_woodland_lakopark_full_name_matches():
+    listing = make_listing(
+        title="Kiadó lakás a Cordia Woodland Lakóparkban",
+        address_text="Budapest, IX. kerület",
+        description_text="Cordia Woodland Lakópark, IX. kerület",
+    )
+    assert filters.passes_hard_filters(listing)
+
+
+def test_nadasdy_utca_matches_as_a_second_address():
+    listing = make_listing(
+        title="Kiadó lakás Nádasdy utcában",
+        address_text="Nádasdy utca Budapest, IX. kerület",
+        description_text="Nádasdy utca 4, Metrodom Green lakópark",
+    )
+    assert filters.passes_hard_filters(listing)
+
+
+def test_nadasdy_utca_variants_all_match_via_substring():
+    # Confirms the substring-matching design already covers every spelling
+    # variant (abbreviation, house number, postal code, district prefix)
+    # without needing them listed separately in config.
+    variants = [
+        "Nádasdy u.",
+        "Nádasdy utca 4",
+        "Nádasdy u. 4",
+        "1097 Nádasdy utca",
+        "1097 Budapest, Nádasdy utca",
+        "Budapest IX. kerület, Nádasdy utca",
+        "IX. kerület Nádasdy utca",
+    ]
+    for text in variants:
+        listing = make_listing(title=text, address_text=text, description_text=text)
+        assert filters.passes_hard_filters(listing), text
+
+
+def test_vagohid_utca_variants_all_match_via_substring():
+    variants = [
+        "Vágóhíd u.",
+        "Vágóhíd utca 12-14",
+        "Vágóhíd u. 12-14",
+        "Vágóhíd utca 12–14",
+        "Vágóhíd utca 9",
+        "1097 Vágóhíd utca 9",
+        "1097 Budapest, Vágóhíd utca 9",
+        "Budapest IX. kerület, Vágóhíd utca",
+        "IX. kerület Vágóhíd utca",
+    ]
+    for text in variants:
+        listing = make_listing(title=text, address_text=text, description_text=text)
+        assert filters.passes_hard_filters(listing), text
+
+
+def test_neighborhood_hint_alone_is_not_sufficient_for_exact_precision():
+    # "Keep it building-specific": a neighborhood/landmark mention, even
+    # combined with a generic "new build" phrase, must never be enough on
+    # its own for a source that's supposed to give an exact street match.
+    listing = make_listing(
+        title="Új, modern lakás kiadó",
+        address_text="Ferencváros, közel a Müpához",
+        description_text="Újépítésű, modern lakás Ferencvárosban, a Duna-parton, közel a Könyves Kálmán körúthoz.",
+    )
+    assert not filters.passes_hard_filters(listing)
+
+
+def test_neighborhood_hint_alone_still_works_for_district_precision_source():
+    # Unchanged, pre-existing behavior for sources that structurally can
+    # never expose a street name (albifigyelo.hu/megveszlak.hu) — this is
+    # the same "district watch" tradeoff chosen earlier, just with more
+    # trigger phrases now available for it.
+    listing = make_listing(
+        title="Kiadó lakás Ferencvárosban",
+        address_text="Ferencváros, Budapest",
+        description_text="Kiadó lakás Ferencvárosban, a Müpa közelében.",
+        location_precision="district",
+    )
+    assert filters.passes_hard_filters(listing)
+
+
 def test_other_cordia_project_is_rejected():
     listing = make_listing(
         title="Cordia Corvin Offices - kiadó lakás",

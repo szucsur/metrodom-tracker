@@ -31,9 +31,16 @@ def location_matches(listing: Listing) -> bool:
         # passes_soft_filters) since it isn't confirmed to be the exact
         # street/building.
         return text_matches_any(haystack, config.LOCATION_HINTS)
+    # Unreachable in practice: this branch only runs when the
+    # ADDRESS_KEYWORDS check above already failed, so re-checking the same
+    # list here can never be True. Kept as an explicit AND (rather than
+    # just `return False`) so the intent — "district hints alone are never
+    # enough for an exact-precision source" — stays obvious in the code.
+    # Referencing config.ADDRESS_KEYWORDS directly (not a separate copy)
+    # so this can't silently drift out of sync as that list grows.
     return (
         text_matches_any(haystack, config.LOCATION_HINTS)
-        and text_matches_any(haystack, ["vágóhíd", "vagohid", "metrodom green"])
+        and text_matches_any(haystack, config.ADDRESS_KEYWORDS)
     )
 
 

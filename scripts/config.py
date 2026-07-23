@@ -11,20 +11,58 @@ ADDRESS_KEYWORDS = [
     "vágóhíd",
     "vagohid",
     "metrodom green",
+    "metrodom green lakópark",
     "cordia woodland",
+    "cordia woodland lakópark",
+    "nádasdy",
+    "nadasdy",
 ]
-# Deliberately NOT including bare "metrodom" or bare "cordia" here: several
-# other buildings share each brand (Metrodom River/Park/Panoráma/City
-# Home/etc.; Cordia develops many unrelated projects across Budapest), and
-# a loose brand-only match would short-circuit location_matches() into
-# treating any of them as a target building — this bit us for real once a
-# source (tappancsosotthon.hu) listed multiple Metrodom buildings at once.
-# The specific complex name ("metrodom green", "cordia woodland") is
-# enough, and is what location_matches() actually needs.
+# Deliberately NOT including bare "metrodom", bare "cordia", "metrodom city
+# home"/"metrodom citihome", "metrodom lakópark", "cordia lakópark", or
+# "green lakópark" here: several other buildings share each brand (Metrodom
+# River/Park/Panoráma/City Home/etc.; Cordia develops many unrelated
+# projects across Budapest; "Green"/"Lakópark" are generic marketing
+# words), and a loose brand-only match would short-circuit
+# location_matches() into treating any of them as a target building — this
+# bit us for real once a source (tappancsosotthon.hu) listed multiple
+# Metrodom buildings at once. The specific complex names above are enough.
+#
+# Also deliberately NOT listing every "Vágóhíd utca"/"Nádasdy utca" spelling
+# variant (Vágóhíd u., Vágóhíd utca 12-14, 1097 Budapest Vágóhíd utca 9,
+# IX. kerület Nádasdy utca, ...): matching is plain substring search (see
+# text_matches_any() in filters.py), so any text containing "vágóhíd" or
+# "nádasdy" anywhere already matches regardless of what number, prefix, or
+# "utca"/"u." abbreviation follows — those variants are already covered by
+# the base keyword, adding them separately wouldn't change any behavior.
+#
+# Nádasdy utca is treated as a second real address for the Metrodom Green
+# complex (per the address list this was configured from), not a
+# broadening to an unrelated street.
 
-# Budapest postal code / district hints used as a secondary signal when a
-# listing doesn't spell out the street name.
-LOCATION_HINTS = ["1097", "ix. ker", "ix.ker", "budapest ix"]
+# Budapest postal code / district / neighborhood hints used as a
+# secondary signal only. For "exact" precision sources these are never
+# enough by themselves — location_matches() still requires a real
+# ADDRESS_KEYWORDS match too. For "district" precision sources (which
+# structurally never expose a street name at all — see albifigyelo.hu/
+# megveszlak.hu) these alone are enough to flag a district-level watch,
+# same as before; that's an existing, already-accepted tradeoff, not new.
+LOCATION_HINTS = [
+    "1097", "ix. ker", "ix.ker", "budapest ix",
+    "ferencváros", "ferencvaros",
+    "középső-ferencváros", "kozepso-ferencvaros",
+    "millenniumi városközpont", "millenniumi varoskozpont",
+    "millenniumi városnegyed", "millenniumi varosnegyed",
+    "mester utca",
+    "soroksári út", "soroksari ut",
+    "könyves kálmán körút", "konyves kalman korut",
+    "kvassay út", "kvassay ut",
+    "duna-part",
+    "rákóczi híd", "rakoczi hid",
+    "müpa", "mupa",
+    "nemzeti színház", "nemzeti szinhaz",
+    "haller utca",
+    "lurdy ház", "lurdy haz",
+]
 
 MIN_SIZE_SQM = 40
 MIN_ROOMS = 2

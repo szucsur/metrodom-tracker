@@ -17,11 +17,11 @@ var SHEET_DAILY = 'Daily_Data';
 var SHEET_SETTINGS = 'Settings';
 var SHEET_SUMMARY = 'Monthly_Summary';
 
-var DAILY_HEADERS = ['ID', 'Date', 'Used Codes', 'Commission Rate', 'Commission', 'Created At', 'Updated At'];
-var SETTINGS_HEADERS = ['Setting', 'Value'];
-var SUMMARY_HEADERS = ['Month', 'Used Codes', 'Commission'];
+var DAILY_HEADERS = ['ID', 'Dátum', 'Felhasznált kódok', 'Jutalék mérték', 'Jutalék', 'Létrehozva', 'Frissítve'];
+var SETTINGS_HEADERS = ['Beállítás', 'Érték'];
+var SUMMARY_HEADERS = ['Hónap', 'Felhasznált kódok', 'Jutalék'];
 
-var SETTING_COMMISSION_PER_CODE = 'Commission per Code';
+var SETTING_COMMISSION_PER_CODE = 'Jutalék kódonként';
 var DEFAULT_COMMISSION_PER_CODE = 500;
 
 var TIMEZONE = Session.getScriptTimeZone() || 'Europe/Budapest';
@@ -126,7 +126,7 @@ function protectSystemColumns_(sheet) {
   ['A:A', 'D:D', 'E:E', 'F:F', 'G:G'].forEach(function (a1) {
     try {
       var range = sheet.getRange(a1);
-      var protection = range.protect().setDescription('System-generated column');
+      var protection = range.protect().setDescription('Rendszer által generált oszlop');
       protection.setWarningOnly(true);
     } catch (err) {
       // Protections can fail on brand-new sheets with no editors set; ignore.
@@ -156,12 +156,12 @@ function doGet(e) {
         result = { summary: computeSummary_(getDailyRecords_(), getCommissionRate_()) };
         break;
       default:
-        return jsonResponse_({ success: false, error: 'Unknown or missing action.' });
+        return jsonResponse_({ success: false, error: 'Ismeretlen vagy hiányzó művelet.' });
     }
     return jsonResponse_({ success: true, data: result });
   } catch (err) {
     logError_('doGet', err);
-    return jsonResponse_({ success: false, error: 'Something went wrong. Please try again.' });
+    return jsonResponse_({ success: false, error: 'Hiba történt. Kérjük, próbálja újra.' });
   }
 }
 
@@ -170,7 +170,7 @@ function doPost(e) {
   try {
     lock.waitLock(10000);
   } catch (err) {
-    return jsonResponse_({ success: false, error: 'System is busy, please try again in a moment.' });
+    return jsonResponse_({ success: false, error: 'A rendszer elfoglalt, kérjük próbálja újra egy pillanat múlva.' });
   }
 
   try {
@@ -178,7 +178,7 @@ function doPost(e) {
     try {
       body = JSON.parse(e.postData.contents);
     } catch (parseErr) {
-      return jsonResponse_({ success: false, error: 'Invalid request format.' });
+      return jsonResponse_({ success: false, error: 'Érvénytelen kérésformátum.' });
     }
 
     var action = body.action;
@@ -199,7 +199,7 @@ function doPost(e) {
         result = updateSettings_(payload);
         break;
       default:
-        return jsonResponse_({ success: false, error: 'Unknown action.' });
+        return jsonResponse_({ success: false, error: 'Ismeretlen művelet.' });
     }
 
     if (result && result.error) {
@@ -209,7 +209,7 @@ function doPost(e) {
     return jsonResponse_({ success: true, data: getAllPayload_() });
   } catch (err) {
     logError_('doPost', err);
-    return jsonResponse_({ success: false, error: 'Something went wrong. Please try again.' });
+    return jsonResponse_({ success: false, error: 'Hiba történt. Kérjük, próbálja újra.' });
   } finally {
     lock.releaseLock();
   }
@@ -316,14 +316,14 @@ function addRecord_(payload) {
 
 function updateRecord_(payload) {
   if (!payload || payload.id === undefined || payload.id === null || payload.id === '') {
-    return { error: 'Missing record ID.' };
+    return { error: 'Hiányzó rögzítés-azonosító.' };
   }
   var validation = validateRecordInput_(payload);
   if (validation.error) return { error: validation.error };
 
   var sheet = getDailySheet_();
   var row = findRowById_(sheet, payload.id);
-  if (row === -1) return { error: 'Record not found.' };
+  if (row === -1) return { error: 'A rögzítés nem található.' };
 
   var rate = getCommissionRate_();
   var commission = validation.usedCodes * rate;
@@ -344,11 +344,11 @@ function updateRecord_(payload) {
 
 function deleteRecord_(payload) {
   if (!payload || payload.id === undefined || payload.id === null || payload.id === '') {
-    return { error: 'Missing record ID.' };
+    return { error: 'Hiányzó rögzítés-azonosító.' };
   }
   var sheet = getDailySheet_();
   var row = findRowById_(sheet, payload.id);
-  if (row === -1) return { error: 'Record not found.' };
+  if (row === -1) return { error: 'A rögzítés nem található.' };
 
   sheet.deleteRow(row);
   rebuildMonthlySummarySheet_();
@@ -356,15 +356,15 @@ function deleteRecord_(payload) {
 }
 
 function validateRecordInput_(payload) {
-  if (!payload) return { error: 'Missing data.' };
+  if (!payload) return { error: 'Hiányzó adat.' };
 
   var dateStr = payload.date;
   if (!dateStr || typeof dateStr !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
-    return { error: 'Please provide a valid date (YYYY-MM-DD).' };
+    return { error: 'Adjon meg egy érvényes dátumot (ÉÉÉÉ-HH-NN).' };
   }
   var dateObj = new Date(dateStr + 'T00:00:00');
   if (isNaN(dateObj.getTime())) {
-    return { error: 'Please provide a valid date.' };
+    return { error: 'Adjon meg egy érvényes dátumot.' };
   }
 
   var usedCodesRaw = payload.usedCodes;
@@ -372,7 +372,7 @@ function validateRecordInput_(payload) {
   if (usedCodesRaw === '' || usedCodesRaw === null || usedCodesRaw === undefined ||
       isNaN(usedCodes) || !isFinite(usedCodes) ||
       Math.floor(usedCodes) !== usedCodes || usedCodes < 0) {
-    return { error: 'Used codes must be a whole number, zero or greater.' };
+    return { error: 'A felhasznált kódok száma egész szám kell legyen, 0 vagy nagyobb.' };
   }
 
   return { dateObj: dateObj, usedCodes: usedCodes };
@@ -408,7 +408,7 @@ function getSettingsPayload_() {
 function updateSettings_(payload) {
   var rate = Number(payload && payload.commissionPerCode);
   if (isNaN(rate) || !isFinite(rate) || rate <= 0) {
-    return { error: 'Commission per code must be a positive number.' };
+    return { error: 'A kódonkénti jutaléknak pozitív számnak kell lennie.' };
   }
 
   var sheet = getSettingsSheet_();
@@ -483,10 +483,13 @@ function computeSummary_(records, currentRate) {
   };
 }
 
+var HU_MONTHS_ = ['január', 'február', 'március', 'április', 'május', 'június',
+  'július', 'augusztus', 'szeptember', 'október', 'november', 'december'];
+
 function monthLabel_(key) {
   var parts = key.split('-');
-  var d = new Date(Number(parts[0]), Number(parts[1]) - 1, 1);
-  return Utilities.formatDate(d, TIMEZONE, 'MMMM yyyy');
+  var monthIndex = Number(parts[1]) - 1;
+  return parts[0] + '. ' + HU_MONTHS_[monthIndex];
 }
 
 function rebuildMonthlySummarySheet_() {

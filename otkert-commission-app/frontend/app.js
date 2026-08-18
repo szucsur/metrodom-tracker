@@ -39,13 +39,13 @@
   function handleResponse(res) {
     if (!res.ok) throw new Error('Network error (' + res.status + ')');
     return res.json().then(function (body) {
-      if (!body.success) throw new Error(body.error || 'Something went wrong. Please try again.');
+      if (!body.success) throw new Error(body.error || 'Hiba történt. Kérjük, próbálja újra.');
       return body.data;
     });
   }
 
   function isConfigured() {
-    return CONFIG.API_URL && CONFIG.API_URL.indexOf('PASTE_YOUR') === -1;
+    return CONFIG.API_URL && CONFIG.API_URL.indexOf('ILLESSZE_BE') === -1;
   }
 
   // -------------------------------------------------------------------
@@ -60,7 +60,7 @@
     setDefaultDate();
 
     if (!isConfigured()) {
-      showBanner('The app is not connected yet. Paste your Apps Script Web App URL into config.js.');
+      showBanner('Az alkalmazás még nincs csatlakoztatva. Illessze be az Apps Script webalkalmazás URL-jét a config.js fájlba.');
       return;
     }
 
@@ -172,7 +172,7 @@
   // -------------------------------------------------------------------
 
   function loadAll(isInitial) {
-    setLoading(true, isInitial ? 'Loading…' : 'Refreshing…');
+    setLoading(true, isInitial ? 'Betöltés…' : 'Frissítés…');
     return apiGet('getAll')
       .then(function (data) {
         state.records = data.records || [];
@@ -215,7 +215,7 @@
     // Year filter options
     var years = uniqueSorted(monthly.map(function (m) { return m.month.substring(0, 4); }));
     var currentYearValue = els.yearFilter.value || state.yearFilter;
-    els.yearFilter.innerHTML = '<option value="">All years</option>' +
+    els.yearFilter.innerHTML = '<option value="">Minden év</option>' +
       years.map(function (y) { return '<option value="' + y + '">' + y + '</option>'; }).join('');
     els.yearFilter.value = years.indexOf(currentYearValue) !== -1 ? currentYearValue : '';
     state.yearFilter = els.yearFilter.value;
@@ -261,7 +261,7 @@
     var valid = els.fieldCodes.value !== '' && !isNaN(codes) && codes >= 0 && Number.isInteger(codes);
     var commission = valid ? codes * rate : 0;
     els.commissionPreviewValue.textContent = formatHuf(commission);
-    els.commissionPreviewHint.textContent = (valid ? codes : 0) + ' codes × ' + formatHuf(rate) + ' / code';
+    els.commissionPreviewHint.textContent = (valid ? codes : 0) + ' kód × ' + formatHuf(rate) + ' / kód';
   }
 
   function validateRecordForm() {
@@ -270,14 +270,14 @@
     els.errorCodes.textContent = '';
 
     if (!els.fieldDate.value) {
-      els.errorDate.textContent = 'Please choose a date.';
+      els.errorDate.textContent = 'Válasszon dátumot.';
       ok = false;
     }
 
     var codesRaw = els.fieldCodes.value;
     var codes = Number(codesRaw);
     if (codesRaw === '' || isNaN(codes) || !Number.isInteger(codes) || codes < 0) {
-      els.errorCodes.textContent = 'Enter a whole number, 0 or greater.';
+      els.errorCodes.textContent = 'Adjon meg egy egész számot, 0 vagy nagyobb.';
       ok = false;
     }
 
@@ -294,7 +294,7 @@
     };
 
     var isEdit = state.editingId !== null;
-    setButtonBusy(els.btnSaveRecord, true, isEdit ? 'Updating…' : 'Saving…');
+    setButtonBusy(els.btnSaveRecord, true, isEdit ? 'Frissítés…' : 'Mentés…');
 
     var request = isEdit
       ? apiPost('updateRecord', Object.assign({ id: state.editingId }, payload))
@@ -306,12 +306,12 @@
         state.settings = data.settings || state.settings;
         state.summary = data.summary || state.summary;
         renderAll();
-        showToast(isEdit ? 'Record updated.' : 'Record saved.', 'success');
+        showToast(isEdit ? 'Rögzítés frissítve.' : 'Rögzítés mentve.', 'success');
         exitEditMode();
         switchView('history');
       })
       .catch(function (err) { showToast(friendlyError(err), 'error'); })
-      .finally(function () { setButtonBusy(els.btnSaveRecord, false, isEdit ? 'Update Record' : 'Save Record'); });
+      .finally(function () { setButtonBusy(els.btnSaveRecord, false, isEdit ? 'Rögzítés frissítése' : 'Rögzítés mentése'); });
   }
 
   function enterEditMode(record) {
@@ -319,8 +319,8 @@
     els.recordId.value = record.id;
     els.fieldDate.value = record.date;
     els.fieldCodes.value = record.usedCodes;
-    els.addFormTitle.textContent = 'Edit Record';
-    els.btnSaveRecord.textContent = 'Update Record';
+    els.addFormTitle.textContent = 'Rögzítés szerkesztése';
+    els.btnSaveRecord.textContent = 'Rögzítés frissítése';
     els.btnCancelEdit.hidden = false;
     updateCommissionPreview();
     switchView('add');
@@ -329,8 +329,8 @@
   function exitEditMode() {
     state.editingId = null;
     els.recordId.value = '';
-    els.addFormTitle.textContent = 'Add Daily Record';
-    els.btnSaveRecord.textContent = 'Save Record';
+    els.addFormTitle.textContent = 'Napi rögzítés hozzáadása';
+    els.btnSaveRecord.textContent = 'Rögzítés mentése';
     els.btnCancelEdit.hidden = true;
     setDefaultDate();
   }
@@ -345,7 +345,7 @@
     // Month filter dropdown options
     var months = uniqueSorted(records.map(function (r) { return r.date.substring(0, 7); })).reverse();
     var currentMonthValue = els.historyMonthFilter.value || state.historyMonthFilter;
-    els.historyMonthFilter.innerHTML = '<option value="">All months</option>' +
+    els.historyMonthFilter.innerHTML = '<option value="">Minden hónap</option>' +
       months.map(function (m) { return '<option value="' + m + '">' + monthLabelFromKey(m) + '</option>'; }).join('');
     els.historyMonthFilter.value = months.indexOf(currentMonthValue) !== -1 ? currentMonthValue : '';
     state.historyMonthFilter = els.historyMonthFilter.value;
@@ -376,8 +376,8 @@
         '<td class="num">' + formatNumber(r.usedCodes) + '</td>' +
         '<td class="num">' + formatHuf(r.commission) + '</td>' +
         '<td><div class="row-actions">' +
-          '<button class="btn-icon" data-action="edit" data-id="' + r.id + '">Edit</button>' +
-          '<button class="btn-icon danger" data-action="delete" data-id="' + r.id + '">Delete</button>' +
+          '<button class="btn-icon" data-action="edit" data-id="' + r.id + '">Szerkesztés</button>' +
+          '<button class="btn-icon danger" data-action="delete" data-id="' + r.id + '">Törlés</button>' +
         '</div></td>' +
       '</tr>';
     }).join('');
@@ -386,13 +386,13 @@
       return '<div class="record-card">' +
         '<div class="record-card-main">' +
           '<span class="record-card-date">' + formatDateDisplay(r.date) + '</span>' +
-          '<span class="record-card-sub">' + formatNumber(r.usedCodes) + ' codes</span>' +
+          '<span class="record-card-sub">' + formatNumber(r.usedCodes) + ' kód</span>' +
         '</div>' +
         '<div class="record-card-main" style="align-items:flex-end">' +
           '<span class="record-card-commission">' + formatHuf(r.commission) + '</span>' +
           '<div class="record-card-actions">' +
-            '<button class="btn-icon" data-action="edit" data-id="' + r.id + '">Edit</button>' +
-            '<button class="btn-icon danger" data-action="delete" data-id="' + r.id + '">Delete</button>' +
+            '<button class="btn-icon" data-action="edit" data-id="' + r.id + '">Szerkesztés</button>' +
+            '<button class="btn-icon danger" data-action="delete" data-id="' + r.id + '">Törlés</button>' +
           '</div>' +
         '</div>' +
       '</div>';
@@ -430,7 +430,7 @@
   function onConfirmDelete() {
     var id = state.deleteTargetId;
     if (id === null) return;
-    setButtonBusy(els.confirmOk, true, 'Deleting…');
+    setButtonBusy(els.confirmOk, true, 'Törlés…');
 
     apiPost('deleteRecord', { id: id })
       .then(function (data) {
@@ -438,11 +438,11 @@
         state.settings = data.settings || state.settings;
         state.summary = data.summary || state.summary;
         renderAll();
-        showToast('Record deleted.', 'success');
+        showToast('Rögzítés törölve.', 'success');
         closeConfirmModal();
       })
       .catch(function (err) { showToast(friendlyError(err), 'error'); })
-      .finally(function () { setButtonBusy(els.confirmOk, false, 'Delete'); });
+      .finally(function () { setButtonBusy(els.confirmOk, false, 'Törlés'); });
   }
 
   // -------------------------------------------------------------------
@@ -463,21 +463,21 @@
 
     var rate = Number(els.fieldRate.value);
     if (!els.fieldRate.value || isNaN(rate) || rate <= 0) {
-      els.errorRate.textContent = 'Enter a positive number.';
+      els.errorRate.textContent = 'Adjon meg egy pozitív számot.';
       return;
     }
 
-    setButtonBusy(els.btnSaveSettings, true, 'Saving…');
+    setButtonBusy(els.btnSaveSettings, true, 'Mentés…');
     apiPost('updateSettings', { commissionPerCode: rate })
       .then(function (data) {
         state.records = data.records || [];
         state.settings = data.settings || state.settings;
         state.summary = data.summary || state.summary;
         renderAll();
-        showToast('Commission rate updated.', 'success');
+        showToast('Jutalék mérték frissítve.', 'success');
       })
       .catch(function (err) { showToast(friendlyError(err), 'error'); })
-      .finally(function () { setButtonBusy(els.btnSaveSettings, false, 'Save Setting'); });
+      .finally(function () { setButtonBusy(els.btnSaveSettings, false, 'Beállítás mentése'); });
   }
 
   // -------------------------------------------------------------------
@@ -516,12 +516,17 @@
   function friendlyError(err) {
     var msg = (err && err.message) || '';
     if (msg && msg.length < 140 && !/script error|typeerror|referenceerror/i.test(msg)) return msg;
-    return 'Something went wrong. Please try again.';
+    return 'Hiba történt. Kérjük, próbálja újra.';
   }
 
   // -------------------------------------------------------------------
-  // Formatting helpers
+  // Formatting helpers (Hungarian conventions)
   // -------------------------------------------------------------------
+
+  var HU_MONTHS = ['január', 'február', 'március', 'április', 'május', 'június',
+    'július', 'augusztus', 'szeptember', 'október', 'november', 'december'];
+  var HU_MONTHS_SHORT = ['jan.', 'febr.', 'márc.', 'ápr.', 'máj.', 'jún.',
+    'júl.', 'aug.', 'szept.', 'okt.', 'nov.', 'dec.'];
 
   function formatHuf(n) {
     return formatNumber(n) + ' HUF';
@@ -529,23 +534,25 @@
 
   function formatNumber(n) {
     n = Number(n) || 0;
-    return n.toLocaleString('en-US');
+    return n.toLocaleString('hu-HU');
   }
 
   function formatDateDisplay(iso) {
     var parts = iso.split('-');
-    var d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
-    return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+    var monthIdx = Number(parts[1]) - 1;
+    return parts[0] + '. ' + HU_MONTHS_SHORT[monthIdx] + ' ' + Number(parts[2]) + '.';
   }
 
   function monthLabelFromKey(key) {
     var parts = key.split('-');
-    var d = new Date(Number(parts[0]), Number(parts[1]) - 1, 1);
-    return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    var monthIdx = Number(parts[1]) - 1;
+    return parts[0] + '. ' + HU_MONTHS[monthIdx];
   }
 
   function shortMonthLabel(fullLabel) {
-    return fullLabel.split(' ')[0].substring(0, 3);
+    var monthName = fullLabel.split(' ')[1] || fullLabel;
+    var idx = HU_MONTHS.indexOf(monthName);
+    return idx === -1 ? monthName.substring(0, 4) : HU_MONTHS_SHORT[idx];
   }
 
   function toIsoDate(d) {

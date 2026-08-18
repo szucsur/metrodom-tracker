@@ -1,9 +1,9 @@
-// ÖTKERT Commission Tracker — configuration
+// ÖTKERT Jutalék Nyilvántartó — beállítások
 //
-// Paste your deployed Google Apps Script Web App URL below.
-// It looks like: https://script.google.com/macros/s/AKfycb.../exec
-// See the setup guide (README.md) for how to get this URL.
+// Illessze be ide a telepített Google Apps Script webalkalmazás URL-jét.
+// Formátuma: https://script.google.com/macros/s/AKfycb.../exec
+// Lásd a README.md útmutatót, hogyan szerezze meg ezt az URL-t.
 
 var CONFIG = {
-  API_URL: 'PASTE_YOUR_APPS_SCRIPT_WEB_APP_URL_HERE'
+  API_URL: 'ILLESSZE_BE_IDE_AZ_APPS_SCRIPT_WEBALKALMAZAS_URL_JET'
 };
